@@ -28,7 +28,7 @@ suffices to record aggregate data for two programs, `:NS` and `:CB`, during the 
 Detailed applicant records only need to include applicants to whom an offer of admission was extended.
 The requirements are described by [`NormalizedApplicant(applicant; program_history)`](@ref).
 
-## match criteria
+## Match criteria
 
 Applicants 1 and 2 are matched by the following function:
 
@@ -45,25 +45,26 @@ Smaller ``\sigma_t`` increases the importance of the timing of the offer, and wo
 wait-list offers should be treated quite differently from initial offers.
 The units of both ``\sigma`` parameters are those of the `NormalizedApplicant`s, i.e., with values ranging
 between 0 and 1.
-For example, setting ``\sigma_t = 0.2`` would, in essence, break the decision period (typically mid-January to April 15th) into roughly 5 periods, and match against applicants only extended offers during the same period.
+For example, setting ``\sigma_t = 0.2`` would, in essence, break the decision period (typically mid-January to April 15th) into roughly 5 periods, and match primarily against applicants who were extended offers during the same period.
 Note that the applicant ranks will typically be quite heavily weighted to low values (e.g., a program that only
 accepts the top 20% of applicants will only exhibit ranks between 0.0 and 0.2), and as a consequence ``\sigma_r`` must
 be smaller than this span to have large effect.
 
-This fundamental matching function is augmented by options to require a match between programs and the possibility to
-exclude past applicants who had already rendered their decision by this point in the admissions season.
-(The latter is intended to support modeling the currently-undecided applicants solely in terms of prior applicants
-who were also undecided at this point.) See [`match_function`](@ref) for specific details.
+This fundamental matching function is augmented by options to:
+- require that the matching applicants are from the same program
+- exclude past applicants who had already rendered their decision by this point in the admissions season. (The latter is intended to support modeling the currently-undecided applicants solely in terms of prior applicants who were also undecided at this point.)
+See [`match_function`](@ref) for specific details.
 
-## Running simulations
+## Analysis and simulations
 
-Once you've entered student records and defined a matching function, then for each outstanding offer you can compute the match likelihood of previous applicants using [`match_clikelihood`](@ref).
-The final element in the returned list is a rough measure of the "number" of prior applicants deemed to be a good match
+Once you've entered student records and defined a matching function, then for each outstanding offer you can compute the match likelihood of previous applicants using [`match_likelihood`](@ref).
+The sum of the returned list is a rough measure of the "number" of prior applicants deemed to be a good match
 for the applicant you are modeling; if this value is small, your criteria for matching may be too stringent.
 Conversely, if this value is approximately equal to the total number of prior applicants, you're essentially treating
-all students as equivalent.
+all students as equivalent (and matching all of them).
 
-Once the likelihood is computed, [`select_applicant`](@ref) then allows you to randomly sample these by likelihood, and serves as the basis for running simulations about outcomes.
+Once the likelihood is computed, [`matriculation_probability`](@ref) estimates the probability that the given applicant
+will accept an offer. [`select_applicant`](@ref) allows you to randomly sample these by likelihood, and serves as the basis for running simulations about outcomes.
 
 ## API reference
 

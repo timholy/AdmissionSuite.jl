@@ -23,30 +23,33 @@ end
 
     applicant = NormalizedApplicant((program=:NS, rank=11, offerdate=Date("2021-01-13")); program_history)
 
+    # A match function that heavily weights normalized rank
     fmatch = match_function((matchprogram=false, σr=0.01, σt=Inf))
-    clike = match_clikelihood(fmatch, past_applicants, applicant, 0.0)
-    like = diff(pushfirst!(copy(clike), 0))
+    like = match_likelihood(fmatch, past_applicants, applicant, 0.0)
     @test like[3] > like[1] > like[2]
+    @test matriculation_probability(like, past_applicants) > 0.95
+    clike = cumsum(like)
     s = [select_applicant(clike, past_applicants) for i = 1:100]
     sc = first.(sort(collect(pairs(countby(s))); by=last))
     @test sc[end].program == :CB    # best match is to rank 11/302 ≈ 6/160
     @test sc[end-1].program == :NS && sc[end-1].normrank == Float32(7/302)
 
+    # A match function that heavily weights offer date
     fmatch = match_function((matchprogram=false, σr=Inf, σt=0.3))
-    clike = match_clikelihood(fmatch, past_applicants, applicant, 0.0)
-    like = diff(pushfirst!(copy(clike), 0))
+    like = match_likelihood(fmatch, past_applicants, applicant, 0.0)
     @test like[1] == like[2] == 1
     @test like[1] > like[3]
+    @test 0.48 < matriculation_probability(like, past_applicants) < 0.52
 
+    # Require program-specific matching
     fmatch = match_function((matchprogram=true, σr=0.01, σt=Inf))
-    clike = match_clikelihood(fmatch, past_applicants, applicant, Date("2021-01-13"); program_history)
-    like = diff(pushfirst!(copy(clike), 0))
+    like = match_likelihood(fmatch, past_applicants, applicant, Date("2021-01-13"); program_history)
     @test like[1] > like[2]
     @test like[3] == 0
 
+    # Excluding applicants who had already decided at this point in the season
     fmatch = match_function((matchprogram=true, σr=0.01, σt=Inf))
-    clike = match_clikelihood(fmatch, past_applicants, applicant, Date("2021-04-01"); program_history)
-    like = diff(pushfirst!(copy(clike), 0))
+    like = match_likelihood(fmatch, past_applicants, applicant, Date("2021-04-01"); program_history)
     @test like[2] > 0
     @test like[1] == like[3] == 0
 end

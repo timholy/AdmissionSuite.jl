@@ -4,7 +4,7 @@ using Distributions
 using Dates
 using DocStringExtensions
 
-export NormalizedApplicant, match_clikelihood, match_function, normdate, program_data, select_applicant
+export NormalizedApplicant, match_likelihood, match_function, matriculation_probability, normdate, program_data, select_applicant
 
 """
 `NormalizedApplicant` holds normalized data about an applicant who received, or may receive, an offer of admission.
@@ -76,49 +76,36 @@ end
 
 
 """
-    clikelihood = match_clikelihood(fmatch::Function,
-                                    past_applicants::AbstractVector{NormalizedApplicant},
-                                    applicant::NormalizedApplicant,
-                                    tnow::Real)
+    likelihood = match_likelihood(fmatch::Function,
+                                  past_applicants::AbstractVector{NormalizedApplicant},
+                                  applicant::NormalizedApplicant,
+                                  tnow::Real)
 
-Compute the cumulative likelihood among `past_applicants` for matching `applicant`. `tnow` is the current date
+Compute the likelihood among `past_applicants` for matching `applicant`. `tnow` is the current date
 in normalized form (see [`normdate`](@ref)), and is used to exclude previous applicants who had already made
 a decision by `tnow`.
 
 See also: [`match_function`](@ref), [`select_applicant`](@ref).
 """
-function match_clikelihood(fmatch::Function,
-                           past_applicants::AbstractVector{NormalizedApplicant},
-                           applicant::NormalizedApplicant,
-                           tnow::Real)
-    return cumsum([fmatch(applicant, app, tnow) for app in past_applicants])
+function match_likelihood(fmatch::Function,
+                          past_applicants::AbstractVector{NormalizedApplicant},
+                          applicant::NormalizedApplicant,
+                          tnow::Real)
+    return [fmatch(applicant, app, tnow) for app in past_applicants]
 end
 
 """
-    clikelihood = match_clikelihood(fmatch, past_applicants, applicant, tnow::Date; program_history)
+    likelihood = match_likelihood(fmatch, past_applicants, applicant, tnow::Date; program_history)
 
 Use this format if supplying `tnow` in `Date` format.
 """
-function match_clikelihood(fmatch::Function,
-                           past_applicants::AbstractVector{NormalizedApplicant},
-                           applicant::NormalizedApplicant,
-                           tnow::Date;
-                           program_history)
+function match_likelihood(fmatch::Function,
+                          past_applicants::AbstractVector{NormalizedApplicant},
+                          applicant::NormalizedApplicant,
+                          tnow::Date;
+                          program_history)
     pdata = program_data(applicant, program_history)
-    return match_clikelihood(fmatch, past_applicants, applicant, normdate(tnow, pdata))
-end
-
-"""
-    past_applicant = select_applicant(clikelihood, past_applicants)
-
-Select a previous applicant from among `past_applicants`, using the cumulative likelihood `clikelihood`.
-
-See also: `match_clikelihood`.
-"""
-function select_applicant(clikelihood, past_applicants)
-    r = rand() * clikelihood[end]
-    idx = searchsortedlast(clikelihood, r) + 1
-    return past_applicants[idx]
+    return match_likelihood(fmatch, past_applicants, applicant, normdate(tnow, pdata))
 end
 
 """
@@ -130,7 +117,7 @@ Generate a matching function comparing two applicants.
 
 will return a number between 0 and 1, with 1 indicating a perfect match.
 `template` is the applicant you wish to find a match for, and `applicant` is a candidate match.
-`tnow` is used to exclude (aka, return 0) `applicant`s who had already decided by `tnow`.
+`tnow` is used to exclude `applicant`s who had already decided by `tnow`.
 
 The parameters of `fmatch` are determined by `criteria`:
 - `criteria.matchprogram::Bool`: if `true`, only students from the same program are considered (all others return 0.0)
@@ -149,6 +136,58 @@ function match_function(criteria)
                     ((template.normrank - applicant.normrank)/criteria.σr)^2/2)
     end
 end
+
+## Analysis and simulations
+
+"""
+    p = matriculation_probability(likelihood, past_applicants)
+
+Compute the probability that applicants weighted by `likelihood` would matriculate into the program, based on the
+choices made by `past_applicants`.
+
+`likelihood` can be computed by [`match_likelihood`](@ref).
+"""
+function matriculation_probability(likelihood, past_applicants)
+    axes(likelihood) == axes(past_applicants) || throw(DimensionMismatch("axes of `likelihood` and `past_applicants` must agree"))
+    lyes = lno = zero(eltype(likelihood))
+    for (l, app) in zip(likelihood, past_applicants)
+        if ismissing(app.accept)
+            error("past applicants must all be decided")
+        elseif app.accept
+            lyes += l
+        else
+            lno += l
+        end
+    end
+    return lyes / (lyes + lno)
+end
+
+"""
+    past_applicant = select_applicant(clikelihood, past_applicants)
+
+Select a previous applicant from among `past_applicants`, using the cumulative likelihood `clikelihood`.
+This can be computed as `cumsum(likelihood)`, where `likelihood` is computed by [`match_likelihood`](@ref).
+"""
+function select_applicant(clikelihood, past_applicants)
+    r = rand() * clikelihood[end]
+    idx = searchsortedlast(clikelihood, r) + 1
+    return past_applicants[idx]
+end
+
+function run_simulation(clikelihoods::AbstractVector{<:AbstractVector{<:Real}},
+                        past_applicants::AbstractVector{NormalizedApplicant},
+                        nsim::Int)
+    map(clikelihoods) do clike
+        nsucc = 0
+        for i = 1:nsim
+            app = select_applicant(clike, past_applicants)
+            nsucc += app.accept
+        end
+        nsucc/nsim
+    end
+end
+
+## Lower-level utilities
 
 # TODO: check against standard abbreviations
 validateprogram(program::Symbol) = program
