@@ -52,4 +52,19 @@ end
     like = match_likelihood(fmatch, past_applicants, applicant, Date("2021-04-01"); program_history)
     @test like[2] > 0
     @test like[1] == like[3] == 0
+
+    # I/O
+    program_history = read_program_history(joinpath(@__DIR__, "data", "programdata.csv"))
+    new_applicants = [(program=:NS, rank=7, offerdate=Date("2021-01-13")),
+                      (program=:NS, rank=3, offerdate=Date("2021-01-13")),
+                      (program=:CB, rank=6, offerdate=Date("2021-03-25")),
+    ]
+    new_applicants = [NormalizedApplicant(app; program_history) for app in new_applicants]
+    past_applicants = read_applicant_data(joinpath(@__DIR__, "data", "applicantdata.csv"); program_history)
+    fmatch = match_function((matchprogram=true, σr=0.05, σt=0.5))
+    pmatric = map(new_applicants) do applicant
+        like = match_likelihood(fmatch, past_applicants, applicant, 0.0)
+        matriculation_probability(like, past_applicants)
+    end
+    @test all(x -> 0 <= x <= 1, pmatric)
 end

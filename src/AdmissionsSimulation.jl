@@ -3,8 +3,10 @@ module AdmissionsSimulation
 using Distributions
 using Dates
 using DocStringExtensions
+using CSV
 
 export NormalizedApplicant, match_likelihood, match_function, matriculation_probability, normdate, program_data, select_applicant
+export read_program_history, read_applicant_data
 
 """
 `NormalizedApplicant` holds normalized data about an applicant who received, or may receive, an offer of admission.
@@ -37,9 +39,8 @@ struct NormalizedApplicant
 
     """
     Normalized date at which the applicant replied with a decision. This uses the same scale as `normofferdate`.
-    Consequently, an applicant who decided almost immediately
-    would have a `normdecidedate` shortly after the `normofferdate`, whereas a candidate who decided on the final day
-    will have a value of 1.0.
+    Consequently, an applicant who decided almost immediately would have a `normdecidedate` shortly after the `normofferdate`,
+    whereas a candidate who decided on the final day will have a value of 1.0.
 
     Use `missing` if the applicant has not yet decided.
     """
@@ -69,9 +70,9 @@ function NormalizedApplicant(applicant; program_history)
     pdata = program_data(applicant, program_history)
     normrank = applicant_score(applicant.rank, pdata)
     toffer = normdate(applicant.offerdate, pdata)
-    tdecide = hasfield(typeof(applicant), :decidedate) ? normdate(applicant.decidedate, pdata) : missing
-    accept = hasfield(typeof(applicant), :accept) ? applicant.accept : missing
-    return NormalizedApplicant(applicant.program, season(applicant), normrank, toffer, tdecide, accept)
+    tdecide = hasproperty(applicant, :decidedate) ? normdate(applicant.decidedate, pdata) : missing
+    accept = hasproperty(applicant, :accept) ? applicant.accept : missing
+    return NormalizedApplicant(program, season(applicant), normrank, toffer, tdecide, accept)
 end
 
 
@@ -174,16 +175,57 @@ function select_applicant(clikelihood, past_applicants)
     return past_applicants[idx]
 end
 
-function run_simulation(clikelihoods::AbstractVector{<:AbstractVector{<:Real}},
-                        past_applicants::AbstractVector{NormalizedApplicant},
+"""
+    nmatriculants = run_simulation(pmatric, nsim::Int)
+
+Given a list of candidates with probability of matriculation `pmatric`, perform `nsim` simulations of their
+admission decisions and compute the total number of matriculants in each simulation.
+"""
+function run_simulation(pmatric::AbstractVector{<:Real},
                         nsim::Int)
-    map(clikelihoods) do clike
-        nsucc = 0
-        for i = 1:nsim
-            app = select_applicant(clike, past_applicants)
-            nsucc += app.accept
+    function nmatric(ps)
+        n = 0
+        for p in ps
+            n += (rand() <= p)
         end
-        nsucc/nsim
+        return n
+    end
+    return [nmatric(pmatric) for i = 1:nsim]
+end
+
+## I/O
+
+"""
+    program_history = read_program_history(filename)
+
+Read program history from a file. See "$(@__DIR__)/test/data/programdata.csv" for an example of the format.
+"""
+function read_program_history(filename::AbstractString)
+    _, ext = splitext(filename)
+    ext ∈ (".csv", ".tsv") || error("only CSV files may be read")
+    rows = CSV.Rows(filename; types=Dict("year"=>Int, "program"=>String, "slots"=>Int, "napplicants"=>Int, "lastdecisiondate"=>Date))
+    try
+        return Dict(map(rows) do row
+            (year=row.year, program=Symbol(row.program)) => (slots=row.slots, napplicants=row.napplicants, firstofferdate=date_or_missing(row.firstofferdate), lastdecisiondate=row.lastdecisiondate)
+        end)
+    catch
+        error("the headers must be year (Int), program (String), slots (Int), napplicants (Int), firstofferdate (Date or missing), lastdecisiondate (Date). The case must match.")
+    end
+end
+
+"""
+    past_applicants = read_applicant_data(filename; program_history)
+
+Read past applicant data from a file. See "$(@__DIR__)/test/data/applicantdata.csv" for an example of the format.
+"""
+function read_applicant_data(filename::AbstractString; program_history)
+    _, ext = splitext(filename)
+    ext ∈ (".csv", ".tsv") || error("only CSV files may be read")
+    rows = CSV.Rows(filename; types=Dict("program"=>String,"rank"=>Int,"offerdate"=>Date,"decidedate"=>Date,"accept"=>Bool))
+    try
+        return [NormalizedApplicant(row; program_history) for row in rows]
+    catch
+        error("the headers must be program (String), rank (Int), offerdate (Date), decidedate (Date), accept (Bool). The case must match.")
     end
 end
 
@@ -191,6 +233,11 @@ end
 
 # TODO: check against standard abbreviations
 validateprogram(program::Symbol) = program
+validateprogram(program::AbstractString) = validateprogram(Symbol(program))
+
+date_or_missing(::Missing) = missing
+date_or_missing(date::Date) = date
+date_or_missing(date::AbstractString) = Date(date)
 
 """
     normdate(t::Date, pdata)
@@ -218,7 +265,7 @@ program_history = Dict((year=2021, program=:NS) => (slots=15, napplicants=302, f
 """
 program_data(applicant, program_history) = program_history[program_key(applicant, program_history)]
 
-program_key(applicant, ::Dict{K}) where K<:NamedTuple = convert(K, (year=season(applicant), program=applicant.program))
+program_key(applicant, ::Dict{K}) where K<:NamedTuple = convert(K, (year=season(applicant), program=validateprogram(applicant.program)))
 
 season(applicant) = year(applicant.offerdate) + (month(applicant.offerdate) > 7)
 season(applicant::NormalizedApplicant) = applicant.season
