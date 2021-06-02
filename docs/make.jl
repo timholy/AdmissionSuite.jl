@@ -20,4 +20,5 @@ makedocs(;
 
 deploydocs(;
     repo="github.com/timholy/AdmissionsSimulation.jl",
+    devbranch="main",
 )
