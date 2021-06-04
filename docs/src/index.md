@@ -19,14 +19,19 @@ Records on previous applicants are in two forms: very general information is sto
 a dictionary recording just a few bits of information for each program. For example:
 
 ```julia
-    program_history = Dict((year=2021, program=:NS) => (slots=15, napplicants=302, firstofferdate=Date("2021-01-13"), lastdecisiondate=Date("2021-04-15")),
-                           (year=2021, program=:CB) => (slots=5,  napplicants=160, firstofferdate=Date("2021-01-6"),  lastdecisiondate=Date("2021-04-15")),
+    program_history = Dict(ProgramKey(season=2021, program="NS") => ProgramData(slots=15, napplicants=302, firstofferdate=Date("2021-01-13"), lastdecisiondate=Date("2021-04-15")),
+                           ProgramKey(season=2021, program="CB") => ProgramData(slots=5,  napplicants=160, firstofferdate=Date("2021-01-6"),  lastdecisiondate=Date("2021-04-15")))
 
 ```
-suffices to record aggregate data for two programs, `:NS` and `:CB`, during the 2021 season (corresponding to a decision deadline of April 15, 2021). This records the target number of matriculants (`slots`), the total number of applications received, the date of the very first offers extended, and the date on which a decision was due.
+suffices to record aggregate data for two programs, `"NS"` and `"CB"`, during the 2021 season (corresponding to a decision deadline of April 15, 2021). This records the target number of matriculants (`slots`), the total number of applications received, the date of the very first offers extended, and the date on which a decision was due.
+
+Valid choices for program names are listed in `AdmissionsSimulation.program_lookups`; internally the code always uses
+the abbreviation, but the
 
 Detailed applicant records only need to include applicants to whom an offer of admission was extended.
 The requirements are described by [`NormalizedApplicant(applicant; program_history)`](@ref).
+
+You can load both the program history and data on applicants using [`read_program_history`](@ref) and [`read_applicant_data`](@ref).
 
 ## Match criteria
 
