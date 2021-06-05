@@ -8,7 +8,7 @@ using CSV
 
 export ProgramKey, ProgramData, NormalizedApplicant
 export match_likelihood, match_function, matriculation_probability, select_applicant
-export normdate, program_data
+export normdate
 export read_program_history, read_applicant_data
 
 """
@@ -118,9 +118,10 @@ struct NormalizedApplicant
 end
 
 """
-    normapp = NormalizedApplicant(applicant; program_history)
+    normapp = NormalizedApplicant(; program, rank=missing, offerdate, decidedate=missing, accept=missing, program_history)
 
-Convert `applicant` from "natural" units to normalized units. `applicant` may be anything having the following fields:
+Create an applicant from "natural" units, where rank is an integer and dates are expressed in `Date` format.
+Some are required (those without a default value), others are optional:
 - `program`: a string encoding the program
 - `rank::Int`: the rank of the applicant compared to other applicants to the same program in the same season.
    Use 1 for the top candidate; the bottom candidate should have rank equal to the number of applications received.
@@ -128,17 +129,33 @@ Convert `applicant` from "natural" units to normalized units. `applicant` may be
 - `decidedate`: the date on which the candidate replied with a verdict, or `missing`
 - `accept`: `true` if the candidate accepted our offer, `false` if it was turned down, `missing` if it is unknown.
 
-`program_history` should be a dictionary compatible with [`program_data`](@ref).
+`program_history` should be a dictionary mapping [`ProgramKey`](@ref)s to [`ProgramData`](@ref).
 """
-function NormalizedApplicant(applicant; program_history)
-    program = validateprogram(applicant.program)
-    pdata = program_data(applicant, program_history)
-    normrank = applicant_score(applicant.rank, pdata)
-    toffer = normdate(applicant.offerdate, pdata)
-    tdecide = hasproperty(applicant, :decidedate) ? normdate(applicant.decidedate, pdata) : missing
-    accept = hasproperty(applicant, :accept) ? applicant.accept : missing
-    return NormalizedApplicant(program, season(applicant), normrank, toffer, tdecide, accept)
+function NormalizedApplicant(; program::AbstractString,
+                               rank::Union{Integer,Missing}=missing,
+                               offerdate::Date,
+                               decidedate::Union{Date,Missing}=missing,
+                               accept::Union{Bool,Missing}=missing,
+                               program_history)
+    program = validateprogram(program)
+    pdata = program_history[ProgramKey(program, season(offerdate))]
+    normrank = applicant_score(rank, pdata)
+    toffer = normdate(offerdate, pdata)
+    tdecide = ismissing(decidedate) ? missing : normdate(decidedate, pdata)
+    accept = ismissing(accept) ? missing : accept
+    return NormalizedApplicant(program, season(offerdate), normrank, toffer, tdecide, accept)
 end
+# This version is useful for, e.g., reading from a CSV.Row
+NormalizedApplicant(applicant; program_history) = NormalizedApplicant(;
+    program = applicant.program,
+    rank = hasproperty(applicant, :rank) ? applicant.rank : missing,
+    offerdate = applicant.offerdate,
+    decidedate = hasproperty(applicant, :decidedate) ? applicant.decidedate : missing,
+    accept = hasproperty(applicant, :accept) ? applicant.accept : missing,
+    program_history
+)
+
+ProgramKey(app::NormalizedApplicant) = ProgramKey(app.program, app.season)
 
 
 """
@@ -170,7 +187,7 @@ function match_likelihood(fmatch::Function,
                           applicant::NormalizedApplicant,
                           tnow::Date;
                           program_history)
-    pdata = program_data(applicant, program_history)
+    pdata = program_history[ProgramKey(applicant)]
     return match_likelihood(fmatch, past_applicants, applicant, normdate(tnow, pdata))
 end
 
@@ -195,7 +212,7 @@ function match_function(; matchprogram::Bool=false, σr=Inf32, σt=Inf32)
     σt = convert(Union{Float32,Missing}, σt)
     return function(template::NormalizedApplicant, applicant::NormalizedApplicant, tnow::Union{Real,Missing})
         # Include only applicants that hadn't decided by tnow
-        !ismissing(tnow) && tnow > applicant.normdecidedate && return 0.0f0
+        !ismissing(tnow) && !ismissing(applicant.normdecidedate) && tnow > applicant.normdecidedate && return 0.0f0
         # Check whether we need to match the program
         if matchprogram
             template.program !== applicant.program && return 0.0f0
@@ -265,35 +282,31 @@ end
 
 """
     program_history = read_program_history(filename)
-    program_history = read_program_history(f, filename)
 
 Read program history from a file. See "$(@__DIR__)/test/data/programdata.csv" for an example of the format.
 
 The second form allows you to transform each row with `f(row)` before extracting the data. This allows you to
 handle input formats that differ from the default.
 """
-function read_program_history(f::Function, filename::AbstractString)
+function read_program_history(filename::AbstractString)
     _, ext = splitext(filename)
     ext ∈ (".csv", ".tsv") || error("only CSV files may be read")
     rows = CSV.Rows(filename; types=Dict("year"=>Int, "program"=>String, "slots"=>Int, "nmatriculants"=>Int, "napplicants"=>Int, "lastdecisiondate"=>Date))
     try
         return Dict(map(rows) do row
-            rowf = f(row)
-            ProgramKey(season=rowf.year, program=rowf.program) => ProgramData(slots=rowf.slots,
-                                                                              nmatriculants=get(rowf, :nmatriculants, missing),
-                                                                              napplicants=rowf.napplicants,
-                                                                              firstofferdate=date_or_missing(rowf.firstofferdate),
-                                                                              lastdecisiondate=rowf.lastdecisiondate)
+            ProgramKey(season=row.year, program=row.program) => ProgramData(slots=row.slots,
+                                                                            nmatriculants=get(row, :nmatriculants, missing),
+                                                                            napplicants=row.napplicants,
+                                                                            firstofferdate=date_or_missing(row.firstofferdate),
+                                                                            lastdecisiondate=row.lastdecisiondate)
         end)
     catch
         error("the headers must be year (Int), program (String), slots (Int), napplicants (Int), firstofferdate (Date or missing), lastdecisiondate (Date). The case must match.")
     end
 end
-read_program_history(filename::AbstractString) = read_program_history(identity, filename)
 
 """
     past_applicants = read_applicant_data(filename; program_history)
-    past_applicants = read_applicant_data(f, filename; program_history)
 
 Read past applicant data from a file. See "$(@__DIR__)/test/data/applicantdata.csv" for an example of the format.
 
@@ -313,7 +326,6 @@ end
 
 ## Lower-level utilities
 
-# TODO: check against standard abbreviations
 const program_lookups = Dict("Biochemistry" => "B",
                              "Biochemistry, Biophysics, and Structural Biology" => "BBSB",
                              "Biomedical Informatics and Data Science" => "BIDS",
@@ -337,12 +349,12 @@ date_or_missing(date::Date) = date
 date_or_missing(date::AbstractString) = Date(date)
 
 """
-    normdate(t::Date, pdata)
+    normdate(t::Date, pdata::ProgramData)
 
 Express `t` as a fraction of the gap between the first offer date and last decision date as stored in
-`pdata` (see [`program_data`](@ref)).
+`pdata` (see [`ProgramData`](@ref)).
 """
-function normdate(t::Date, pdata)
+function normdate(t::Date, pdata::ProgramData)
     clamp((t - pdata.firstofferdate) / (pdata.lastdecisiondate - pdata.firstofferdate), 0, 1)
 end
 normdate(t::Real, pdata) = t
@@ -350,23 +362,7 @@ normdate(t::Real, pdata) = t
 applicant_score(rank::Int, pdata) = rank / pdata.napplicants
 applicant_score(rank::Missing, pdata) = rank
 
-"""
-    pdata = program_data(applicant, program_history)
-
-Return data for the program and admission season matching `applicant`. One accepted format is the following:
-
-```
-program_history = Dict(ProgramKey(season=2021, program="NS") => ProgramData(slots=15, napplicants=302, firstofferdate=Date("2021-01-13"), lastdecisiondate=Date("2021-04-15")),
-                       ProgramKey(season=2021, program="CB") => ProgramData(slots=5,  napplicants=160, firstofferdate=Date("2021-01-6"),  lastdecisiondate=Date("2021-04-15")),
-)
-```
-"""
-program_data(applicant, program_history) = program_history[program_key(applicant, program_history)]
-
-program_key(applicant, ::Dict{ProgramKey}) = ProgramKey(applicant.program, season(applicant))
-
-season(applicant) = hasproperty(applicant, :decidedate) ? year(applicant.decidedate) :
-                    year(applicant.offerdate) + (month(applicant.offerdate) > 7)
+season(date::Date) = year(date) + (month(date) > 7)
 season(applicant::NormalizedApplicant) = applicant.season
 
 end

@@ -19,9 +19,9 @@ end
                        (program="NS", rank=3, offerdate=Date("2021-01-13"), decidedate=Date("2021-04-15"), accept=false),
                        (program="CB", rank=6, offerdate=Date("2021-03-25"), decidedate=Date("2021-04-15"), accept=true),
     ]
-    past_applicants = [NormalizedApplicant(app; program_history) for app in past_applicants]
+    past_applicants = [NormalizedApplicant(; app..., program_history) for app in past_applicants]
 
-    applicant = NormalizedApplicant((program="NS", rank=11, offerdate=Date("2021-01-13")); program_history)
+    applicant = NormalizedApplicant(; program="NS", rank=11, offerdate=Date("2021-01-13"), program_history)
 
     # A match function that heavily weights normalized rank
     fmatch = match_function(matchprogram=false, σr=0.01, σt=Inf)
@@ -59,7 +59,7 @@ end
                       (program="NS", rank=3, offerdate=Date("2021-01-13")),
                       (program="CB", rank=6, offerdate=Date("2021-03-25")),
     ]
-    new_applicants = [NormalizedApplicant(app; program_history) for app in new_applicants]
+    new_applicants = [NormalizedApplicant(; app..., program_history) for app in new_applicants]
     past_applicants = read_applicant_data(joinpath(@__DIR__, "data", "applicantdata.csv"); program_history)
     fmatch = match_function(matchprogram=true, σr=0.05, σt=0.5)
     pmatric = map(new_applicants) do applicant

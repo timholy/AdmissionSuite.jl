@@ -10,68 +10,74 @@ for i = 1:size(prog, 1)
         prog[i, "Program"] = prog[i-1, "Program"]
     end
 end
-progdata = Dict(ProgramKey(row."Program", row."Year") => (slots=row."Target", napplicants=row."Applicants") for row in eachrow(prog))
+progdata = Dict(ProgramKey(row."Program", row."Year") => (slots=row."Target", nmatriculants=row."Matriculants", napplicants=row."Applicants") for row in eachrow(prog))
 
 
 appfile = "AcceptOffered_Hold_Outcome_w_Dates.csv"
 df = DataFrame(CSV.File(appfile))
+
+function parserow(row, program_history; warn::Bool=false)
+    p = row."Program"
+    da = row."Acceptance Offered"
+    if !ismissing(da)
+        dadmit = Date(da, dfmt)
+        accept = row."Final Outcome" ∈ ("Class Member", "Deferred")
+        ddecide = missing
+        if accept
+            dy = row."Class Member"
+            ddecide = ismissing(dy) ? missing : Date(dy, dfmt)
+        else
+            dy = row."Declined"
+            if !ismissing(dy)
+                ddecide = Date(dy, dfmt)
+            else
+                applicant = row."Applicant"
+                warn && @warn("no decision date found for $applicant")
+                pd = program_history[ProgramKey(row."Program", row."Enroll Year")]
+                ddecide = hasproperty(pd, :lastdecisiondate) ? pd.lastdecisiondate : missing
+            end
+        end
+        return p, dadmit, ddecide, accept
+    end
+    return nothing
+end
 
 # Extract program history: the date of the first admissions offers, the date of the decision deadline
 gdf = groupby(df, ["Enroll Year", "Program"])
 dfmt = dateformat"mm/dd/yyyy"
 program_history = Dict{ProgramKey,ProgramData}()
 for g in gdf
-    dadmit, ddecide = Date(now()), Date(0.0)  # sentinel values
+    dadmit, ddecide = today(), Date(0.0)  # sentinel values
+    nadmit = 0
     for row in eachrow(g)
-        da = row."Acceptance Offered"
-        if !ismissing(da)
-            dadmit = min(dadmit, Date(da, dfmt))
-            dy = row."Class Member"
-            if !ismissing(dy)
-                ddecide = max(ddecide, Date(dy, dfmt))
-            else
-                dy = row."Declined"
-                if !ismissing(dy)
-                    ddecide = max(ddecide, Date(dy, dfmt))
-                end
-            end
+        ret = parserow(row, progdata)
+        ret === nothing && continue
+        _, thisdadmit, thisddecide, accept = ret
+        dadmit = min(dadmit, thisdadmit)
+        if !ismissing(thisddecide)
+            ddecide = max(ddecide, thisddecide)
         end
+        nadmit += accept
     end
     g1 = first(g)
     key = ProgramKey(g1."Program", g1."Enroll Year")
     pd = progdata[key]
-    program_history[key] = ProgramData(slots=pd.slots, napplicants=pd.napplicants, firstofferdate=dadmit, lastdecisiondate=ddecide)
+    nadmit == pd.nmatriculants || @warn "$key claims $(pd.nmatriculants) matriculants, got $nadmit"
+    program_history[key] = ProgramData(slots=pd.slots, nmatriculants=nadmit, napplicants=pd.napplicants, firstofferdate=dadmit, lastdecisiondate=ddecide)
 end
 
 # Parse each applicant
 applicants = NormalizedApplicant[]
 for row in eachrow(df)
-    p = row."Program"
-    da = row."Acceptance Offered"
-    if !ismissing(da)
-        dadmit = Date(da, dfmt)
-        accept = ddecide = missing
-        dy = row."Class Member"
-        if !ismissing(dy)
-            ddecide = Date(dy, dfmt)
-            accept = true
-        else
-            dy = row."Declined"
-            if !ismissing(dy)
-                ddecide = Date(dy, dfmt)
-                accept = false
-            else
-                applicant = row."Applicant"
-                @warn("no decision date found for $applicant")
-                ddecide = program_history[ProgramKey(row."Program", row."Enroll Year")].lastdecisiondate
-                accept = row."Final Outcome" == "Class Member"
-            end
-        end
-        push!(applicants, NormalizedApplicant((program=p, rank=missing, offerdate=dadmit, decidedate=ddecide, accept=accept); program_history))
-    end
+    ret = parserow(row, program_history; warn=true)
+    ret === nothing && continue
+    progname, dadmit, ddecide, accept = ret
+    push!(applicants, NormalizedApplicant(; program=progname, offerdate=dadmit, decidedate=ddecide, accept=accept, program_history))
 end
 
+
 # Tune the matching function. Here we only have program and offer date to use.
+# Experimentation suggests that it's good to match the program.
 lastyear = maximum(app->app.season, applicants)
 past_applicants = filter(app->app.season != lastyear, applicants)
 applicants = filter(app->app.season == lastyear, applicants)
