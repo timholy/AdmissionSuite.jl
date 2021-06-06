@@ -1,14 +1,16 @@
 module AdmissionsSimulation
 
-using Base: String
 using Distributions
 using Dates
 using DocStringExtensions
 using CSV
+using Measurements
+using Statistics
+using ProgressMeter
 
 export ProgramKey, ProgramData, NormalizedApplicant
-export Outcome, offerdata, yielddata, program_similarity, cached_similarity
-export match_likelihood, match_function, matriculation_probability, select_applicant
+export Outcome, ProgramYieldPrediction, offerdata, yielddata, program_similarity, cached_similarity
+export match_likelihood, match_function, matriculation_probability, select_applicant, net_probability, wait_list_offers
 export normdate
 export read_program_history, read_applicant_data
 
@@ -33,6 +35,7 @@ struct ProgramKey
     ProgramKey(program::AbstractString, season::Integer) = new(validateprogram(program), season)
 end
 ProgramKey(; program, season) = ProgramKey(program, season)
+ProgramKey(program::AbstractString, date::Date) = ProgramKey(program, season(date))
 
 """
 `ProgramData` stores summary data for a particular program and admissions season.
@@ -178,20 +181,20 @@ total(outcome::Outcome) = outcome.ndeclines + outcome.naccepts
 
 myzero(::Type{NTuple{N,T}}) where {N,T} = ntuple(_ -> myzero(T), N)
 myzero(::Type{T}) where T = zero(T)
-myplus(a::NTuple{N}, b::NTuple{N}) where N = myplus.(a, b)
-myplus(a, b) = a + b
+# myplus(a::NTuple{N}, b::NTuple{N}) where N = myplus.(a, b)
+# myplus(a, b) = a + b
 
 makekey(::Dict{ProgramKey}, key::ProgramKey) = key
 makekey(::Dict{String}, key::ProgramKey) = key.program
 
-function addoffer!(offers, applicant)
-    key = makekey(offers, ProgramKey(applicant))
-    count = get(offers, key, myzero(valtype(offers)))
-    N = length(count)
-    j = max(1, ceil(Int, N*applicant.normofferdate))
-    newcount = ntuple(i -> count[i] + (i == j), N)
-    offers[key] = newcount
-end
+# function addoffer!(offers, applicant)
+#     key = makekey(offers, ProgramKey(applicant))
+#     count = get(offers, key, myzero(valtype(offers)))
+#     N = length(count)
+#     j = max(1, ceil(Int, N*applicant.normofferdate))
+#     newcount = ntuple(i -> count[i] + (i == j), N)
+#     offers[key] = newcount
+# end
 
 """
     offerdata(applicants, program_history)
@@ -200,18 +203,20 @@ Summarize application and offer data for each program. The output is a dictionar
 The program selectivity is the ratio `noffers/napplicants`.
 """
 function offerdata(applicants, program_history)
+    usedkeys = Set{ProgramKey}()
     cumoffers = Dict{String,Int}()
-    for app in applicants
-        key = ProgramKey(app).program
+    cumapps = Dict{String,Int}()
+    for app in applicants   # doing everything triggered by applicants ensures we match years
+        pk = ProgramKey(app)
+        key = pk.program
+        if pk ∉ usedkeys
+            push!(usedkeys, pk)
+            cumapps[key] = get(cumapps, key, 0) + program_history[pk].napplicants
+        end
         cumoffers[key] = get(cumoffers, key, 0) + 1
     end
-    cumapps = Dict{String,Int}()
-    for (k, pd) in program_history
-        key = k.program
-        cumapps[key] = get(cumapps, key, 0) + pd.napplicants
-    end
     result = Dict{String, Tuple{Int,Int}}()
-    for (key, ) in cumoffers
+    for (key, _) in cumoffers
         result[key] = (cumoffers[key], cumapps[key])
     end
     return result
@@ -310,7 +315,7 @@ function cached_similarity(σsel, σyield; offerdata, yielddata)
     end
     function progsim(p1::AbstractString, p2::AbstractString)
         key = p1 <= p2 ? (p1, p2) : (p2, p1)
-        return cached_similarity[key]
+        return get(cached_similarity, key, 1.0f0)  # if no program matches, match against all
     end
     return progsim
 end
@@ -417,13 +422,13 @@ function select_applicant(clikelihood, past_applicants)
 end
 
 """
-    nmatriculants = run_simulation(pmatric, nsim::Int)
+    nmatriculants = run_simulation(pmatric::AbstractVector, nsim::Int=100)
 
-Given a list of candidates with probability of matriculation `pmatric`, perform `nsim` simulations of their
+Given a list of candidates each with probability of matriculation `pmatric[i]`, perform `nsim` simulations of their
 admission decisions and compute the total number of matriculants in each simulation.
 """
 function run_simulation(pmatric::AbstractVector{<:Real},
-                        nsim::Int)
+                        nsim::Int=100)
     function nmatric(ps)
         n = 0
         for p in ps
@@ -432,6 +437,153 @@ function run_simulation(pmatric::AbstractVector{<:Real},
         return n
     end
     return [nmatric(pmatric) for i = 1:nsim]
+end
+
+"""
+`ProgramYieldPrediction` records mid-season predictions and data for a particular program.
+
+$(TYPEDFIELDS)
+"""
+struct ProgramYieldPrediction
+    """
+    The predicted number of matriculants.
+    """
+    nmatriculants::Measurement{Float32}
+
+    """
+    The program's priority for receiving wait list offers. The program with the highest priority should get the next offer.
+    Priority is computed as `deficit/stddev`, where `deficit` is the predicted undershoot (which might be negative if the program
+    is predicted to overshoot) and `stddev` is the square root of the target (Poisson noise).
+    Thus, programs are prioritized by the significance of the deficit.
+    """
+    priority::Float32
+
+    """
+    The two-tailed p-value of the actual outcome (if supplied). This includes the effects of any future wait-list offers.
+    """
+    poutcome::Union{Float32,Missing}
+end
+ProgramYieldPrediction(nmatriculants, priority) = ProgramYieldPrediction(nmatriculants, priority, missing)
+
+priority(pred, target) = (target - pred)/sqrt(target)
+
+"""
+    nmatric, progstatus = wait_list_offers(fmatch::Function,
+                                           past_applicants::AbstractVector{NormalizedApplicant},
+                                           applicants::AbstractVector{NormalizedApplicant},
+                                           tnow::Date;
+                                           program_history,
+                                           actual_yield=nothing)
+
+Compute the estimated number `nmatric` of matriculants and the program-specific yield prediction and wait-list priority, `progstatus`.
+`progstatus` is a mapping `progname => progyp::ProgramYieldPrediction` (see [`ProgramYieldPrediction`](@ref)).
+
+The arguments are similarly to [`match_likelihood`](@ref).
+"""
+function wait_list_offers(fmatch::Function,
+                          past_applicants::AbstractVector{NormalizedApplicant},
+                          applicants::AbstractVector{NormalizedApplicant},
+                          tnow::Union{Date,Real};
+                          program_history,
+                          actual_yield=nothing)
+    yr = season(only(unique(season, applicants)))
+    progyields = Dict{String,ProgramYieldPrediction}()
+    nmatric = 0.0f0
+    for (progkey, progdata) in program_history
+        progkey.season == yr || continue
+        progname = progkey.program
+        ntnow = isa(tnow, Date) ? normdate(tnow, progdata) : tnow
+        # Select applicants to this program who already have an offer
+        papplicants = filter(app -> app.program == progname && (app.normofferdate < ntnow || iszero(app.normofferdate)), applicants)
+        pmatric = map(papplicants) do applicant
+            applicant.normdecidedate <= ntnow && return Float32(applicant.accept)
+            like = match_likelihood(fmatch, past_applicants, applicant, ntnow)
+            return matriculation_probability(like, past_applicants)
+        end
+        prognmatric = sum(pmatric)
+        simnmatric = run_simulation(pmatric, 10^4)
+        estmatric = round(mean(simnmatric); digits=1) ± round(std(simnmatric); digits=1)
+        progtarget = progdata.target_corrected
+        poutcome = missing
+        if actual_yield !== nothing
+            wlapplicants = filter(app -> app.program == progname && (app.normofferdate >= ntnow && !iszero(app.normofferdate)), applicants)
+            for applicant in wlapplicants
+                like = match_likelihood(fmatch, past_applicants, applicant, ntnow)
+                push!(pmatric, matriculation_probability(like, past_applicants))
+            end
+            wlnmatric = sum(pmatric)
+            simnmatric = run_simulation(pmatric, 10^4)
+            yld = actual_yield[progname]
+            Δyld = abs(yld - wlnmatric)
+            poutcome = sum(abs.(simnmatric .- wlnmatric) .>= Δyld)/length(simnmatric)
+        end
+        progyields[progname] = ProgramYieldPrediction(estmatric, priority(prognmatric, progtarget), poutcome)
+        nmatric += prognmatric
+    end
+    return nmatric, progyields
+end
+
+## Model training
+
+# Tune the match parameters to optimize accuracy of prediction
+
+function net_probability(σsel::Real, σyield::Real, σr::Real, σt::Real;
+                         applicants, past_applicants, offerdata, yielddata,
+                         #= fraction of prior applicants that must match =# rmatch_floor=0.01)
+    progsim = cached_similarity(σsel, σyield; offerdata, yielddata)
+    fmatch = match_function(; σr, σt, progsim)
+    cprob = 0.0f0
+    for applicant in applicants
+        like = match_likelihood(fmatch, past_applicants, applicant, 0.0f0)
+        sum(like) < rmatch_floor*length(past_applicants) && return -Inf32
+        p = matriculation_probability(like, past_applicants)
+        isnan(p) && continue
+        cprob += applicant.accept ? p : -p
+    end
+    return cprob
+end
+
+"""
+    net_probability(σsels::AbstractVector, σyields::AbstractVector, σrs::AbstractVector, σts::AbstractVector;
+                    applicants, program_history)
+
+Compute the net probability of prediction using historical data. For each year in `program_history` other than the earliest,
+use prior data to predict the probability of matriculation for each applicant. If `p` is the probability for a particular applicant,
+it contributes positively (`+p`) if the offer was accepted, and negatively (`-p`) if the offer was declined.
+Thus, successful prediction maximizes the net probability.
+
+The `σ` lists contain the values that will be used to compute accuracy; the return value is a 4-dimensional array evaluating
+the net probability for all possible combinations of these parameters. `σsel` and `σyield` will be used by [`cached_similarity`](@ref)
+to determine program similarity; `σr` and `σs` will be used to measure applicant similarity.
+
+Tuning essentially corresponds to picking the index of the entry of the return value and then setting each parameter accordingly:
+
+```julia
+np = net_probability(σsels, σyields, σrs, σts; applicants, program_history)
+idx = argmax(np)
+σsel, σyield, σr, σt = σsels[idx[1]], σyields[idx[2]], σrs[idx[3]], σts[idx[4]]
+```
+"""
+function net_probability(σsels::AbstractVector, σyields::AbstractVector, σrs::AbstractVector, σts::AbstractVector;
+                         applicants, program_history, kwargs...)
+    yrmin, yrmax = extrema(pk->pk.season, keys(program_history))
+    cprob = zeros(Float32, length(σsels), length(σyields), length(σrs), length(σts))
+    progress = Progress((yrmax - yrmin)*length(σrs)*length(σts); desc="Computing accuracy vs parameters for each year (progress slows in later years): ")
+    for yr = yrmin+1:yrmax
+        yrapplicants = filter(app -> app.season == yr, applicants)
+        prevapplicants = filter(app -> app.season < yr, applicants)
+        od = offerdata(prevapplicants, program_history)
+        yd = yielddata(Tuple{Outcome,Outcome,Outcome}, prevapplicants)
+        for k in eachindex(σrs), l in eachindex(σts)
+            for i in eachindex(σsels), j in eachindex(σyields)
+                cprob[i,j,k,l] += net_probability(σsels[i], σyields[j], σrs[k], σts[l];
+                                                applicants=yrapplicants, past_applicants=prevapplicants,
+                                                offerdata=od, yielddata=yd, kwargs...)
+            end
+            ProgressMeter.next!(progress; showvalues=[(:yr, yr)])
+        end
+    end
+    return cprob
 end
 
 ## I/O

@@ -1,5 +1,6 @@
 using AdmissionsSimulation
-using CSV
+using AdmissionsSimulation.CSV
+using AdmissionsSimulation.Measurements
 using DataFrames
 using Dates
 
@@ -18,6 +19,7 @@ df = DataFrame(CSV.File(appfile))
 
 function parserow(row, program_history; warn::Bool=false)
     p = row."Program"
+    ishold = !ismissing(row."Interviewed, Hold") || !ismissing(row."Interviewed, High Hold")
     da = row."Acceptance Offered"
     if !ismissing(da)
         dadmit = Date(da, dfmt)
@@ -37,66 +39,135 @@ function parserow(row, program_history; warn::Bool=false)
                 ddecide = hasproperty(pd, :lastdecisiondate) ? pd.lastdecisiondate : missing
             end
         end
-        return p, dadmit, ddecide, accept
+        return p, dadmit, ddecide, accept, ishold
     end
-    return nothing
+    return ishold
 end
 
 # Extract program history: the date of the first admissions offers, the date of the decision deadline
 gdf = groupby(df, ["Enroll Year", "Program"])
 dfmt = dateformat"mm/dd/yyyy"
 program_history = Dict{ProgramKey,ProgramData}()
+program_offers = Dict{ProgramKey,Tuple{Int,Int}}()   # (nadmit, nhold)
 for g in gdf
+    local nmatric
     dadmit, ddecide = today(), Date(0.0)  # sentinel values
-    nadmit = 0
+    nmatric = 0
+    nadmit = nhold = 0
     for row in eachrow(g)
         ret = parserow(row, progdata)
-        ret === nothing && continue
-        _, thisdadmit, thisddecide, accept = ret
+        if isa(ret, Bool)
+            nhold += 1
+            continue
+        end
+        _, thisdadmit, thisddecide, accept, ishold = ret
         dadmit = min(dadmit, thisdadmit)
         if !ismissing(thisddecide)
             ddecide = max(ddecide, thisddecide)
         end
-        nadmit += accept
+        nmatric += accept
+        nadmit += !ishold
+        nhold += ishold
     end
     g1 = first(g)
     key = ProgramKey(g1."Program", g1."Enroll Year")
     pd = progdata[key]
-    nadmit == pd.nmatriculants || @warn "$key claims $(pd.nmatriculants) matriculants, got $nadmit"
-    program_history[key] = ProgramData(slots=pd.slots, nmatriculants=nadmit, napplicants=pd.napplicants, firstofferdate=dadmit, lastdecisiondate=ddecide)
+    nmatric == pd.nmatriculants || @warn "$key claims $(pd.nmatriculants) matriculants, got $nmatric"
+    program_history[key] = ProgramData(slots=pd.slots, nmatriculants=nmatric, napplicants=pd.napplicants, firstofferdate=dadmit, lastdecisiondate=ddecide)
+    program_offers[key] = (nadmit, nhold)
 end
 
 # Parse each applicant
 applicants = NormalizedApplicant[]
 for row in eachrow(df)
     ret = parserow(row, program_history; warn=true)
-    ret === nothing && continue
-    progname, dadmit, ddecide, accept = ret
-    push!(applicants, NormalizedApplicant(; program=progname, offerdate=dadmit, decidedate=ddecide, accept=accept, program_history))
+    isa(ret, Bool) && continue
+    progname, dadmit, ddecide, accept, ishold = ret
+    key = ProgramKey(progname, dadmit)
+    po = program_offers[key]
+    push!(applicants, NormalizedApplicant(; program=progname, rank=(ishold ? po[1] : 1), offerdate=dadmit, decidedate=ddecide, accept=accept, program_history))
 end
 
-# Program stats
-offdata = AdmissionsSimulation.offerdata(applicants, program_history)
-using AdmissionsSimulation: Outcome
-ydata = AdmissionsSimulation.yielddata(Tuple{Outcome,Outcome,Outcome}, applicants)
-progsim = AdmissionsSimulation.cached_similarity(0.3f0, 0.3f0; offerdata=offdata, yielddata=ydata)
+## Tune the matching function
+# Note the more combinations, the longer it takes
+σsels = [0.01, 0.02, 0.05, 0.1, 0.2, 0.5]
+σyields = [0.01, 0.02, 0.05, 0.1, 0.2, 0.5]
+σrs = [0.01, 0.02, 0.05, 0.1, 0.2, 0.5]
+σts = [0.1, 0.2, 0.5, 1.0, 2.0]
+cprob = net_probability(σsels, σyields, σrs, σts; applicants, program_history)
+idx = argmax(cprob)
+σsel, σyield, σr, σt = σsels[idx[1]], σyields[idx[2]], σrs[idx[3]], σts[idx[4]]
 
-
-# Tune the matching function. Here we only have program and offer date to use.
-# Experimentation suggests that it's good to match the program.
-lastyear = maximum(app->app.season, applicants)
-past_applicants = filter(app->app.season != lastyear, applicants)
-applicants = filter(app->app.season == lastyear, applicants)
-function netlikelihood(σt, applicants, past_applicants; matchprogram=false)
-    fmatch = match_function(;matchprogram, σt)
-    l = 0.0f0
-    for app in applicants
-        p = matriculation_probability(match_likelihood(fmatch, past_applicants, app, 0.0f0), past_applicants)
-        isnan(p) && continue
-        l += app.accept ? p : -p
+# Now let's re-run the most recent season using proposed strategies
+lastyear = maximum(pk -> pk.season, keys(program_history))
+test_applicants = filter(app->app.season == lastyear, applicants)
+past_applicants = filter(app->app.season < lastyear, applicants)
+offerdat = offerdata(past_applicants, program_history)
+yielddat = yielddata(Tuple{Outcome,Outcome,Outcome}, past_applicants)
+progsim = cached_similarity(σsel, σyield; offerdata=offerdat, yielddata=yielddat)
+fmatch = match_function(; σr, σt, progsim)
+smatric = nmatric = tmatric = 0.0f0
+println("Predictions based on all offers made (including wait list), from the vantage point of the beginning of the season:")
+for progname in sort(collect(AdmissionsSimulation.program_abbrvs))
+    global smatric, nmatric, tmatric
+    papps = filter(app->app.program == progname, test_applicants)
+    isempty(papps) && continue
+    nmatch, smatch = 0.0f0, 0.0f0
+    tnow = 0.0f0
+    for app in papps
+        like = match_likelihood(fmatch, past_applicants, app, tnow)
+        slike = sum(like)
+        iszero(slike) && continue
+        nmatch += slike
+        p = matriculation_probability(like, past_applicants)
+        smatch += p
     end
-    return l
+    progkey = ProgramKey(progname, lastyear)
+    pd = program_history[progkey]
+    println(progname,
+            ": mean # matched = ", nmatch/length(papps),
+            ", target = ", pd.target_raw,
+            ", estimated matriculation = ", smatch,
+            ", actual matriculation = ", pd.nmatriculants)
+    nmatch == 0 && continue
+    smatric += smatch
+    tmatric += pd.target_raw
+    nmatric += pd.nmatriculants
 end
-σtrng = 0.1:0.1:1.5
-nlk = [netlikelihood(σt, applicants, past_applicants; matchprogram=true) for σt in σtrng]
-σt = σtrng[argmax(nlk)]
+println("DBBS totals: target = $tmatric, estimated = $smatric, actual = $nmatric")
+
+# Wait list analysis
+function future_offers(applicants, tnow::Date; program_history)
+    offers = Dict{String,Int}()
+    for applicant in applicants
+        pk = ProgramKey(applicant)
+        ntnow = normdate(tnow, program_history[pk])
+        if applicant.normofferdate >= ntnow
+            key = pk.program
+            offers[key] = get(offers, key, 0) + 1
+        end
+    end
+    return offers
+end
+seasonstatus = Dict{Date,Tuple{Float32,DataFrame}}()
+actual_yield = Dict(map(filter(pr -> pr.first.season == lastyear, collect(program_history))) do (pk, pd)
+    pk.program => pd.nmatriculants
+end)
+for tnow in (Date("$lastyear-03-15"), Date("$lastyear-04-01"))
+    local nmatric, progdata, pnames
+    nmatric, progstatus = wait_list_offers(fmatch, past_applicants, test_applicants, tnow; program_history, actual_yield)
+    foffers = future_offers(test_applicants, tnow; program_history)
+    pnames = sort(collect(keys(progstatus)))
+    datedf = DataFrame("Program" => String[], "Target" => Int[], "Predicted" => Measurement{Float32}[], "Priority" => Float32[], "Future offers" => Int[], "Actual" => Int[], "p-value" => Float32[])
+    ntarget = 0
+    for pname in pnames
+        status = progstatus[pname]
+        progkey = ProgramKey(pname, year(tnow))
+        progdata = program_history[progkey]
+        push!(datedf, (pname, progdata.target_corrected, status.nmatriculants, status.priority, get(foffers, pname, 0), progdata.nmatriculants, status.poutcome))
+        ntarget += progdata.target_corrected
+    end
+    println("\n\nOn $tnow, the target was $ntarget and the predicted inflow was $nmatric. Program-specific breakdown:")
+    println(datedf)
+    seasonstatus[tnow] = (nmatric, datedf)
+end
