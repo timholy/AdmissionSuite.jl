@@ -7,6 +7,7 @@ using DocStringExtensions
 using CSV
 
 export ProgramKey, ProgramData, NormalizedApplicant
+export Outcome, offerdata, yielddata, program_similarity, cached_similarity
 export match_likelihood, match_function, matriculation_probability, select_applicant
 export normdate
 export read_program_history, read_applicant_data
@@ -157,6 +158,162 @@ NormalizedApplicant(applicant; program_history) = NormalizedApplicant(;
 
 ProgramKey(app::NormalizedApplicant) = ProgramKey(app.program, app.season)
 
+## Program stats
+
+# These are useful for computing cross-program similarity in the matching functions.
+
+"""
+    Outcome(ndeclines, naccepts)
+
+Tally of the number of declines and accepts for offers of admission.
+"""
+struct Outcome
+    ndeclines::Int
+    naccepts::Int
+end
+Base.zero(::Type{Outcome}) = Outcome(0, 0)
+Base.show(io::IO, outcome::Outcome) = print(io, "(d=", outcome.ndeclines, ", a=", outcome.naccepts, ")")
+Base.:+(a::Outcome, b::Outcome) = Outcome(a.ndeclines + b.ndeclines, a.naccepts + b.naccepts)
+total(outcome::Outcome) = outcome.ndeclines + outcome.naccepts
+
+myzero(::Type{NTuple{N,T}}) where {N,T} = ntuple(_ -> myzero(T), N)
+myzero(::Type{T}) where T = zero(T)
+myplus(a::NTuple{N}, b::NTuple{N}) where N = myplus.(a, b)
+myplus(a, b) = a + b
+
+makekey(::Dict{ProgramKey}, key::ProgramKey) = key
+makekey(::Dict{String}, key::ProgramKey) = key.program
+
+function addoffer!(offers, applicant)
+    key = makekey(offers, ProgramKey(applicant))
+    count = get(offers, key, myzero(valtype(offers)))
+    N = length(count)
+    j = max(1, ceil(Int, N*applicant.normofferdate))
+    newcount = ntuple(i -> count[i] + (i == j), N)
+    offers[key] = newcount
+end
+
+"""
+    offerdata(applicants, program_history)
+
+Summarize application and offer data for each program. The output is a dictionary mapping `programname => (noffers, napplicants)`.
+The program selectivity is the ratio `noffers/napplicants`.
+"""
+function offerdata(applicants, program_history)
+    cumoffers = Dict{String,Int}()
+    for app in applicants
+        key = ProgramKey(app).program
+        cumoffers[key] = get(cumoffers, key, 0) + 1
+    end
+    cumapps = Dict{String,Int}()
+    for (k, pd) in program_history
+        key = k.program
+        cumapps[key] = get(cumapps, key, 0) + pd.napplicants
+    end
+    result = Dict{String, Tuple{Int,Int}}()
+    for (key, ) in cumoffers
+        result[key] = (cumoffers[key], cumapps[key])
+    end
+    return result
+end
+
+addoutcome(count::Outcome, accept::Bool) = Outcome(count.ndeclines + !accept, count.naccepts + accept)
+function addoutcome!(outcomes, applicant)
+    key = makekey(outcomes, ProgramKey(applicant))
+    count = get(outcomes, key, myzero(valtype(outcomes)))
+    if valtype(outcomes) === Outcome
+        outcomes[key] = addoutcome(count, applicant.accept)
+    else
+        N = length(count)
+        j = max(1, ceil(Int, N * (ismissing(applicant.normdecidedate) ? 1.0f0 : applicant.normdecidedate)))
+        newcount = ntuple(i -> i == j ? addoutcome(count[i], applicant.accept) : count[i], N)
+        outcomes[key] = newcount
+    end
+end
+
+"""
+    yielddata(Outcome, applicants)
+    yielddata(Tuple{Outcome,Outcome,Outcome}, applicants)
+
+Compute the outcome of offers of admission for each program. `applicants` should be a list of [`NormalizedApplicant`](@ref).
+The first form computes the [`Outcome`](@ref) for the entire season, and the second breaks the season up into epochs
+of equal duration and computes the outcome for each epoch separately. If provided, [`program_similarity`](@ref) will make use of
+the time-dependence of the yield.
+"""
+function yielddata(::Type{Y}, applicants) where Y <: Union{Outcome,Tuple{Outcome,Vararg{Outcome}}}
+    result = Dict{String,Y}()
+    for applicant in applicants
+        addoutcome!(result, applicant)
+    end
+    return result
+end
+
+## Matching
+
+"""
+    program_similarity(program1::AbstractString, program2::AbstractString;
+                       σsel=Inf32, σyield=Inf32, offerdata, yielddata)
+
+Compute the similarity between `program1` and `program2`, based on selectivity (fraction of applicants who are admitted)
+and yield (fraction of offers that get accepted). The similarity ranges between 0 and 1, with 1 corresponding to
+identical programs.
+
+The keyword arguments are the parameters controlling the similarity computation.
+`offerdata` and `yielddata` are the outputs of two functions of the same name ([`offerdata`](@ref) and [`yielddata`](@ref)).
+`σsel` and `σyield` are the standard deviations of selectivity and yield. The similarity is computed as
+
+```math
+\\exp\\left(-\\frac{(s₁ - s₂)²}{2σ_\\text{sel}²} - \\frac{(y₁ - y₂)²}{2σ_\\text{yield}²}\\right).
+```
+"""
+function program_similarity(program1::AbstractString, program2::AbstractString;
+                            σsel=Inf32, σyield=Inf32, offerdata, yielddata)
+    selpenalty = yieldpenalty = 0.0f0
+    if program1 != program2
+        if offerdata !== nothing
+            o1, a1 = offerdata[program1]
+            o2, a2 = offerdata[program2]
+            selpenalty = ((o1/a1 - o2/a2)/σsel)^2
+        end
+        if yielddata !== nothing
+            y1 = yielddata[program1]
+            y2 = yielddata[program2]
+            ty1 = total(sum(y1))
+            ty2 = total(sum(y2))
+            for (yy1, yy2) in zip(y1, y2)
+                yieldpenalty += (yy1.ndeclines/ty1 - yy2.ndeclines/ty2)^2 + (yy1.naccepts/ty1 - yy2.naccepts/ty2)^2
+            end
+            yieldpenalty /= σyield^2
+        end
+    end
+    return exp(-selpenalty/2 - yieldpenalty/2)
+end
+
+default_similarity(program1, program2) = program1 == program2
+
+"""
+    fsim = cached_similarity(σsel, σyield; offerdata, yielddata)
+
+Cache the result of [`program_similarity`](@ref), creating a function `fsim(program1::AbstractString, program2::AbstractString)`
+to compute the similarity between `program1` and `program2`.
+"""
+function cached_similarity(σsel, σyield; offerdata, yielddata)
+    pnames = sort(collect(keys(yielddata)))
+    cached_similarity = Dict{Tuple{String,String},Float32}()
+    for i = 1:length(pnames)
+        nᵢ = pnames[i]
+        for j = 1:i
+            nⱼ = pnames[j]
+            key = nᵢ <= nⱼ ? (nᵢ, nⱼ) : (nⱼ, nᵢ)
+            cached_similarity[key] = program_similarity(nᵢ, nⱼ; σsel, σyield, offerdata, yielddata)
+        end
+    end
+    function progsim(p1::AbstractString, p2::AbstractString)
+        key = p1 <= p2 ? (p1, p2) : (p2, p1)
+        return cached_similarity[key]
+    end
+    return progsim
+end
 
 """
     likelihood = match_likelihood(fmatch::Function,
@@ -192,7 +349,7 @@ function match_likelihood(fmatch::Function,
 end
 
 """
-    fmatch = match_function(; matchprogram=false, σr=Inf32, σt=Inf32)
+    fmatch = match_function(; σr=Inf32, σt=Inf32, progsim=default_similarity)
 
 Generate a matching function comparing two applicants.
 
@@ -203,23 +360,22 @@ will return a number between 0 and 1, with 1 indicating a perfect match.
 `tnow` is used to exclude `applicant`s who had already decided by `tnow`.
 
 The parameters of `fmatch` are determined by `criteria`:
-- `matchprogram::Bool`: if `true`, only students from the same program are considered (all others return 0.0)
 - `σr`: the standard deviation of `normrank` (use `Inf` or `missing` if you don't want to consider rank in matches)
 - `σt`: the standard deviation of `normofferdate` (use `Inf` or `missing` if you don't want to consider offer date in matches)
+- `progsim`: a function `progsim(program1, program2)` computing the "similarity" between programs.
+  See [`cached_similarity`](@ref).
+  The default returns `true` if `program1 == program2` and `false` otherwise.
 """
-function match_function(; matchprogram::Bool=false, σr=Inf32, σt=Inf32)
+function match_function(; σr=Inf32, σt=Inf32, progsim=default_similarity)
     σr = convert(Union{Float32,Missing}, σr)
     σt = convert(Union{Float32,Missing}, σt)
     return function(template::NormalizedApplicant, applicant::NormalizedApplicant, tnow::Union{Real,Missing})
         # Include only applicants that hadn't decided by tnow
         !ismissing(tnow) && !ismissing(applicant.normdecidedate) && tnow > applicant.normdecidedate && return 0.0f0
-        # Check whether we need to match the program
-        if matchprogram
-            template.program !== applicant.program && return 0.0f0
-        end
+        progcoef = progsim(template.program, applicant.program)
         rankpenalty = coalesce((template.normrank - applicant.normrank)/σr, 0.0f0)^2
         offerdatepenalty = coalesce((template.normofferdate - applicant.normofferdate)/σt, 0.0f0)^2
-        return exp(-rankpenalty/2 - offerdatepenalty/2)
+        return progcoef * exp(-rankpenalty/2 - offerdatepenalty/2)
     end
 end
 

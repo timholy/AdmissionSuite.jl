@@ -38,9 +38,12 @@ You can load both the program history and data on applicants using [`read_progra
 Applicants 1 and 2 are matched by the following function:
 
 ```math
-\exp\left( - \frac{(r_1 - r_2)^2}{2 \sigma_r^2} - \frac{(t_1 - t_2)^2}{2 \sigma_t^2}\right)
+\phi(p_1, p_2) \exp\left( - \frac{(r_1 - r_2)^2}{2 \sigma_r^2} - \frac{(t_1 - t_2)^2}{2 \sigma_t^2}\right).
 ```
-where ``r`` refers to the normalized ranks and ``t`` to the normalized offer date.
+``\phi(p_1, p_2)`` is a measure of similarity between the two applicants' programs, ``p_1`` and ``p_2``,
+based on selectivity and yield.
+The remaining terms are applicant-, rather than program-, specific.
+``r`` refers to the normalized ranks and ``t`` to the normalized offer date.
 The ``\sigma`` parameters measure the standard deviation, i.e., the tolerance for mismatch (larger ``\sigma`` are
 more tolerant of mismatch).
 Smaller ``\sigma_r`` increases the importance of choosing applicants of similar rank, and would indicate
@@ -55,9 +58,7 @@ Note that the applicant ranks will typically be quite heavily weighted to low va
 accepts the top 20% of applicants will only exhibit ranks between 0.0 and 0.2), and as a consequence ``\sigma_r`` must
 be smaller than this span to have large effect.
 
-This fundamental matching function is augmented by options to:
-- require that the matching applicants are from the same program
-- exclude past applicants who had already rendered their decision by this point in the admissions season. (The latter is intended to support modeling the currently-undecided applicants solely in terms of prior applicants who were also undecided at this point.)
+This fundamental matching function is augmented by an option to exclude past applicants who had already rendered their decision by this point in the admissions season. (The latter is intended to support modeling the currently-undecided applicants solely in terms of prior applicants who were also undecided at this point.)
 See [`match_function`](@ref) for specific details.
 
 ## Analysis and simulations
