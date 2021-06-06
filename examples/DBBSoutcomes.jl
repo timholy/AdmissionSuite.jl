@@ -75,6 +75,12 @@ for row in eachrow(df)
     push!(applicants, NormalizedApplicant(; program=progname, offerdate=dadmit, decidedate=ddecide, accept=accept, program_history))
 end
 
+# Program stats
+offdata = AdmissionsSimulation.offerdata(applicants, program_history)
+using AdmissionsSimulation: Outcome
+ydata = AdmissionsSimulation.yielddata(Tuple{Outcome,Outcome,Outcome}, applicants)
+progsim = AdmissionsSimulation.cached_similarity(0.3f0, 0.3f0; offerdata=offdata, yielddata=ydata)
+
 
 # Tune the matching function. Here we only have program and offer date to use.
 # Experimentation suggests that it's good to match the program.
