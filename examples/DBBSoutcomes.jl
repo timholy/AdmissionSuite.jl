@@ -89,19 +89,20 @@ for row in eachrow(df)
 end
 
 ## Tune the matching function
+lastyear = maximum(pk -> pk.season, keys(program_history))
+test_applicants = filter(app->app.season == lastyear, applicants)
+past_applicants = filter(app->app.season < lastyear, applicants)
+
 # Note the more combinations, the longer it takes
 σsels = [0.01, 0.02, 0.05, 0.1, 0.2, 0.5]
 σyields = [0.01, 0.02, 0.05, 0.1, 0.2, 0.5]
 σrs = [0.01, 0.02, 0.05, 0.1, 0.2, 0.5]
 σts = [0.1, 0.2, 0.5, 1.0, 2.0]
-cprob = net_probability(σsels, σyields, σrs, σts; applicants, program_history)
+cprob = net_probability(σsels, σyields, σrs, σts; applicants=past_applicants, program_history)
 idx = argmax(cprob)
 σsel, σyield, σr, σt = σsels[idx[1]], σyields[idx[2]], σrs[idx[3]], σts[idx[4]]
 
 # Now let's re-run the most recent season using proposed strategies
-lastyear = maximum(pk -> pk.season, keys(program_history))
-test_applicants = filter(app->app.season == lastyear, applicants)
-past_applicants = filter(app->app.season < lastyear, applicants)
 offerdat = offerdata(past_applicants, program_history)
 yielddat = yielddata(Tuple{Outcome,Outcome,Outcome}, past_applicants)
 progsim = cached_similarity(σsel, σyield; offerdata=offerdat, yielddata=yielddat)
