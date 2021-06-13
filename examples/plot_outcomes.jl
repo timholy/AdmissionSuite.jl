@@ -1,6 +1,17 @@
 using PyPlot: PyPlot, plt
 using Colors
 
+fig, ax = plt.subplots(1, 1; figsize=(5,3))
+ex_wl, ex_no_wl = extrema(nmatrics_wl), extrema(nmatrics_no_wl)
+nmrng = min(ex_wl[1], ex_no_wl[2]):max(ex_wl[1], ex_no_wl[2])
+ax.hist(nmatrics_wl, bins=nmrng, histtype="step")
+ax.hist(nmatrics_no_wl, bins=nmrng, histtype="step")
+ax.set_xlabel("# of matriculants")
+ax.set_ylabel("# of simulations")
+ax.legend(("all offers", "exclude waitlist"); fontsize="x-small", bbox_to_anchor=(1,1))
+fig.tight_layout()
+fig.savefig("outcome_distribution.pdf")
+
 pnames = setdiff(sort(collect(keys(yielddat))), ["B", "CMB"])  # remove outdated programs
 psim = [progsim(p1, p2) for p1 in pnames, p2 in pnames]
 fig, ax = plt.subplots(1, 1; figsize=(3,3))
