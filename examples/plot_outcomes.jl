@@ -59,3 +59,23 @@ ax.set_ylabel("% of offers")
 ax.legend(lna, pnames; fontsize="x-small", bbox_to_anchor=(1,1))
 fig.tight_layout()
 fig.savefig("program_similarity_data.pdf")
+
+fig, axs = plt.subplots(1, 3; figsize=(7,3))
+ax = axs[1]
+ex = extrema(dbbsnmatric)
+ax.hist(dbbsnmatric; bins=ex[begin]:ex[end])
+ax.set_xlabel("# of matriculants")
+ax.set_ylabel("# of simulations")
+ax = axs[2]
+nex = sort(collect(nexhaust))
+ax.bar(0:length(nex)-1, 100*last.(nex)/length(dbbsnmatric))
+ax.set_xticks(0:length(nex)-1)
+ax.set_xticklabels(first.(nex); rotation="vertical")
+ax.set_ylabel("% of waitlist exhaustion")
+ax = axs[3]
+ax.bar(0:length(dates)-1, noffers / length(dbbsnmatric))
+ax.set_xticks(0:length(dates)-1)
+ax.set_xticklabels(dates; rotation="vertical")
+ax.set_ylabel("Mean # offers extended")
+fig.tight_layout()
+fig.savefig("outcome_waitlist_distribution.pdf")

@@ -163,7 +163,7 @@ end
         test_applicants = filter(app -> app.season == 2021, applicants)
         fmatch = match_function(; σr=0.0001f0)
         actual_yield = Dict("CB" => 3, "NS" => 0)
-        nmatric, progstatus = wait_list_offers(fmatch, past_applicants, test_applicants, Date("2021-01-13"); program_history, actual_yield)
+        nmatric, progstatus = wait_list_analysis(fmatch, past_applicants, test_applicants, Date("2021-01-13"); program_history, actual_yield)
         @test nmatric ≈ 6
         @test progstatus["CB"].nmatriculants.val ≈ 3.5 && progstatus["CB"].nmatriculants.err ≈ 0.5
         @test progstatus["NS"].nmatriculants.val ≈ 2.5 && progstatus["NS"].nmatriculants.err ≈ 0.5
@@ -171,7 +171,7 @@ end
         @test progstatus["CB"].poutcome == 1
         @test progstatus["NS"].poutcome == 0
         # Just make sure this runs
-        nmatric, progstatus = wait_list_offers(fmatch, past_applicants, test_applicants, Date("2021-01-13"); program_history)
+        nmatric, progstatus = wait_list_analysis(fmatch, past_applicants, test_applicants, Date("2021-01-13"); program_history)
         @test nmatric ≈ 6
     end
 end
