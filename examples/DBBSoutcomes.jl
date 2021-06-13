@@ -1,6 +1,7 @@
 using AdmissionsSimulation
 using AdmissionsSimulation.CSV
 using AdmissionsSimulation.Measurements
+using AdmissionsSimulation.ProgressMeter
 using DataFrames
 using Dates
 using Statistics
@@ -194,13 +195,13 @@ function future_offers(applicants, tnow::Date; program_history)
     end
     return offers
 end
-seasonstatus = Dict{Date,Tuple{Float32,DataFrame}}()
+seasonstatus = Dict{Date,Tuple{Measurement{Float32},DataFrame}}()
 actual_yield = Dict(map(filter(pr -> pr.first.season == lastyear, collect(program_history))) do (pk, pd)
     pk.program => pd.nmatriculants
 end)
 for tnow in (Date("$lastyear-03-15"), Date("$lastyear-04-01"))
     local nmatric, progdata, pnames, ntarget
-    nmatric, progstatus = wait_list_offers(fmatch, past_applicants, test_applicants, tnow; program_history, actual_yield)
+    nmatric, progstatus = wait_list_analysis(fmatch, past_applicants, test_applicants, tnow; program_history, actual_yield)
     foffers = future_offers(test_applicants, tnow; program_history)
     pnames = sort(collect(keys(progstatus)))
     datedf = DataFrame("Program" => String[], "Target" => Int[], "Predicted" => Measurement{Float32}[], "Priority" => Float32[], "Future offers" => Int[], "Actual" => Int[], "p-value" => Float32[])
@@ -215,4 +216,76 @@ for tnow in (Date("$lastyear-03-15"), Date("$lastyear-04-01"))
     println("\n\nOn $tnow, the target was $ntarget and the predicted inflow was $nmatric. Program-specific breakdown:")
     println(datedf)
     seasonstatus[tnow] = (nmatric, datedf)
+end
+
+# Run a fake admissions season, in which the code manages the offers and waitlist
+
+function random_applicants(applicants, past_applicants; pval=0.8)
+    pd = program_history[ProgramKey(first(applicants))]
+    target = pd.target_corrected
+    selected = eltype(applicants)[]
+    waiting = similar(selected)
+    pmatrics = Float32[]
+    perm = randperm(length(applicants))
+    i = firstindex(perm)
+    while i <= lastindex(perm)
+        idx = perm[i]
+        app = applicants[idx]
+        newapp = NormalizedApplicant(app.program, app.season, app.normrank, 0.0f0, app.normdecidedate, app.accept)
+        like = match_likelihood(fmatch, past_applicants, newapp, 0.0f0)
+        pmatric = matriculation_probability(like, past_applicants)
+        push!(selected, newapp)
+        push!(pmatrics, pmatric)
+        nmatrics = run_simulation(pmatrics, 1000)
+        sum(nmatrics .<= target) < pval*length(nmatrics) && break
+        i += 1
+    end
+    while i <= lastindex(perm)
+        push!(waiting, applicants[perm[i]])
+        i += 1
+    end
+    return selected, waiting
+end
+
+nsim = 1000
+ntarget = 101
+pval = 0.8
+dates = [Date("2021-03-01"), Date("2021-03-15"), Date("2021-04-01")]
+dbbsnmatric = Int[]
+noffers = zeros(Int, axes(dates))
+progapps = Dict{String,Vector{NormalizedApplicant}}()
+for app in test_applicants
+    list = get!(Vector{NormalizedApplicant}, progapps, app.program)
+    push!(list, app)
+end
+nexhaust = Dict(k => 0 for (k, _) in progapps)
+@showprogress "Simulating wait-list management" for _ = 1:nsim
+    simapplicants = NormalizedApplicant[]
+    waitapplicants = empty(progapps)
+    for (progname, applist) in progapps
+        selected, waiting = random_applicants(applist, past_applicants; pval)
+        append!(simapplicants, selected)
+        waitapplicants[progname] = waiting
+    end
+    isexhaust = Dict(k => false for (k, _) in nexhaust)
+    for i in eachindex(dates)
+        date = dates[i]
+        while true
+            nmatrics, progstatus = wait_list_analysis(fmatch, past_applicants, simapplicants, date; program_history)
+            nmatrics.val + nmatrics.err < ntarget || break
+            # Make another offer
+            priorities = sort([name => status.priority for (name, status) in progstatus]; by=last)
+            while (progname = priorities[end].first; isempty(waitapplicants[progname]))
+                isexhaust[progname] = true
+                pop!(priorities)
+            end
+            waitlist = waitapplicants[priorities[end].first]
+            push!(simapplicants, pop!(waitlist))
+            noffers[i] += 1
+        end
+    end
+    for (progname, isex) in isexhaust
+        nexhaust[progname] += isex
+    end
+    push!(dbbsnmatric, sum(app->app.accept, simapplicants))
 end

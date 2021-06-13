@@ -10,7 +10,7 @@ using ProgressMeter
 
 export ProgramKey, ProgramData, NormalizedApplicant
 export Outcome, ProgramYieldPrediction, offerdata, yielddata, program_similarity, cached_similarity
-export match_likelihood, match_function, matriculation_probability, run_simulation, select_applicant, net_loglike, wait_list_offers
+export match_likelihood, match_function, matriculation_probability, run_simulation, select_applicant, net_loglike, wait_list_analysis
 export normdate
 export read_program_history, read_applicant_data
 
@@ -424,12 +424,12 @@ function select_applicant(clikelihood, past_applicants)
 end
 
 """
-    nmatriculants = run_simulation(pmatric::AbstractVector, nsim::Int=100)
+    nmatriculants = run_simulation(pmatrics::AbstractVector, nsim::Int=100)
 
-Given a list of candidates each with probability of matriculation `pmatric[i]`, perform `nsim` simulations of their
+Given a list of candidates each with probability of matriculation `pmatrics[i]`, perform `nsim` simulations of their
 admission decisions and compute the total number of matriculants in each simulation.
 """
-function run_simulation(pmatric::AbstractVector{<:Real},
+function run_simulation(pmatrics::AbstractVector{<:Real},
                         nsim::Int=100)
     function nmatric(ps)
         n = 0
@@ -438,7 +438,7 @@ function run_simulation(pmatric::AbstractVector{<:Real},
         end
         return n
     end
-    return [nmatric(pmatric) for i = 1:nsim]
+    return [nmatric(pmatrics) for i = 1:nsim]
 end
 
 """
@@ -470,40 +470,41 @@ ProgramYieldPrediction(nmatriculants, priority) = ProgramYieldPrediction(nmatric
 priority(pred, target) = (target - pred)/sqrt(target)
 
 """
-    nmatric, progstatus = wait_list_offers(fmatch::Function,
-                                           past_applicants::AbstractVector{NormalizedApplicant},
-                                           applicants::AbstractVector{NormalizedApplicant},
-                                           tnow::Date;
-                                           program_history,
-                                           actual_yield=nothing)
+    nmatric, progstatus = wait_list_analysis(fmatch::Function,
+                                             past_applicants::AbstractVector{NormalizedApplicant},
+                                             applicants::AbstractVector{NormalizedApplicant},
+                                             tnow::Date;
+                                             program_history,
+                                             actual_yield=nothing)
 
 Compute the estimated number `nmatric` of matriculants and the program-specific yield prediction and wait-list priority, `progstatus`.
 `progstatus` is a mapping `progname => progyp::ProgramYieldPrediction` (see [`ProgramYieldPrediction`](@ref)).
 
-The arguments are similarly to [`match_likelihood`](@ref).
+The arguments are similarly to [`match_likelihood`](@ref). If you're doing a post-hoc analysis, `actual_yield` can be a
+`Dict(progname => nmatric)`, in which case the p-value for the observed outcome will also be stored in `progstatus`.
 """
-function wait_list_offers(fmatch::Function,
-                          past_applicants::AbstractVector{NormalizedApplicant},
-                          applicants::AbstractVector{NormalizedApplicant},
-                          tnow::Union{Date,Real};
-                          program_history,
-                          actual_yield=nothing)
+function wait_list_analysis(fmatch::Function,
+                            past_applicants::AbstractVector{NormalizedApplicant},
+                            applicants::AbstractVector{NormalizedApplicant},
+                            tnow::Union{Date,Real};
+                            program_history,
+                            actual_yield=nothing)
     yr = season(only(unique(season, applicants)))
     progyields = Dict{String,ProgramYieldPrediction}()
-    nmatric = 0.0f0
+    nmatric = 0.0f0 ± 0.0f0
     for (progkey, progdata) in program_history
         progkey.season == yr || continue
         progname = progkey.program
         ntnow = isa(tnow, Date) ? normdate(tnow, progdata) : tnow
         # Select applicants to this program who already have an offer
         papplicants = filter(app -> app.program == progname && (app.normofferdate < ntnow || iszero(app.normofferdate)), applicants)
-        pmatric = map(papplicants) do applicant
+        ppmatrics = map(papplicants) do applicant
             applicant.normdecidedate <= ntnow && return Float32(applicant.accept)
             like = match_likelihood(fmatch, past_applicants, applicant, ntnow)
             return matriculation_probability(like, past_applicants)
         end
-        prognmatric = sum(pmatric)
-        simnmatric = run_simulation(pmatric, 10^4)
+        pnmatric = sum(ppmatrics)
+        simnmatric = run_simulation(ppmatrics, 10^4)
         estmatric = round(mean(simnmatric); digits=1) ± round(std(simnmatric); digits=1)
         progtarget = progdata.target_corrected
         poutcome = missing
@@ -511,16 +512,16 @@ function wait_list_offers(fmatch::Function,
             wlapplicants = filter(app -> app.program == progname && (app.normofferdate >= ntnow && !iszero(app.normofferdate)), applicants)
             for applicant in wlapplicants
                 like = match_likelihood(fmatch, past_applicants, applicant, ntnow)
-                push!(pmatric, matriculation_probability(like, past_applicants))
+                push!(ppmatrics, matriculation_probability(like, past_applicants))
             end
-            wlnmatric = sum(pmatric)
-            simnmatric = run_simulation(pmatric, 10^4)
+            wlnmatric = sum(ppmatrics)
+            simnmatric = run_simulation(ppmatrics, 10^4)
             yld = actual_yield[progname]
             Δyld = abs(yld - wlnmatric)
             poutcome = sum(abs.(simnmatric .- wlnmatric) .>= Δyld)/length(simnmatric)
         end
-        progyields[progname] = ProgramYieldPrediction(estmatric, priority(prognmatric, progtarget), poutcome)
-        nmatric += prognmatric
+        progyields[progname] = ProgramYieldPrediction(estmatric, priority(pnmatric, progtarget), poutcome)
+        nmatric += estmatric
     end
     return nmatric, progyields
 end
