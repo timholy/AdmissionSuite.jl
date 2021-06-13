@@ -3,6 +3,7 @@ using AdmissionsSimulation.CSV
 using AdmissionsSimulation.Measurements
 using DataFrames
 using Dates
+using Statistics
 
 progfile = "program_applicant_data.csv"
 prog = DataFrame(CSV.File(progfile))
@@ -98,7 +99,7 @@ past_applicants = filter(app->app.season < lastyear, applicants)
 σyields = [0.01, 0.02, 0.05, 0.1, 0.2, 0.5]
 σrs = [0.01, 0.02, 0.05, 0.1, 0.2, 0.5]
 σts = [0.1, 0.2, 0.5, 1.0, 2.0]
-cprob = net_probability(σsels, σyields, σrs, σts; applicants=past_applicants, program_history)
+cprob = net_loglike(σsels, σyields, σrs, σts; applicants=past_applicants, program_history)
 idx = argmax(cprob)
 σsel, σyield, σr, σt = σsels[idx[1]], σyields[idx[2]], σrs[idx[3]], σts[idx[4]]
 
@@ -107,35 +108,78 @@ offerdat = offerdata(past_applicants, program_history)
 yielddat = yielddata(Tuple{Outcome,Outcome,Outcome}, past_applicants)
 progsim = cached_similarity(σsel, σyield; offerdata=offerdat, yielddata=yielddat)
 fmatch = match_function(; σr, σt, progsim)
-smatric = nmatric = tmatric = 0.0f0
-println("Predictions based on all offers made (including wait list), from the vantage point of the beginning of the season:")
+
+# First, test whether the matching function produces improved outcomes
+llfunc(pmatrics, applicants) = sum(AdmissionsSimulation.llincrement(p, app) for (p, app) in zip(pmatrics, applicants))
+pmatrics = map(test_applicants) do app
+    like = match_likelihood(fmatch, past_applicants, app, 0.0)
+    matriculation_probability(like, past_applicants)
+end
+llstar = llfunc(pmatrics, test_applicants)
+llshuffle = [llfunc(pmatrics[randperm(end)], test_applicants) for _ = 1:1000]
+println("% of simulations in which a particular matching function outperforms shuffled candidates:")
+println("  Full matching function vs. shuffled: $(mean(llstar .> llshuffle) * 100)%")
+fmatch_prog = match_function(; progsim)
+pmatrics_prog = map(test_applicants) do app
+    like = match_likelihood(fmatch_prog, past_applicants, app, 0.0)
+    matriculation_probability(like, past_applicants)
+end
+llstar_prog = llfunc(pmatrics_prog, test_applicants)
+println("  Matching with only program data (no individual data): $(mean(llstar_prog .> llshuffle) * 100)%")
+fmatch_ind = match_function(; σr, σt, progsim=(pa,pb)->true)
+pmatrics_ind = map(test_applicants) do app
+    like = match_likelihood(fmatch_ind, past_applicants, app, 0.0)
+    matriculation_probability(like, past_applicants)
+end
+llstar_ind = llfunc(pmatrics_ind, test_applicants)
+println("  Matching with only individual data (no program data): $(mean(llstar_ind .> llshuffle) * 100)%")
+println()
+
+# Next, analyze the admission season
+round1(x) = round(x; digits=1)
+nmatric = tmatric = 0
+smatric = 0.0f0 ± 0.0f0
+tnow = 0.0f0
+startdf = DataFrame("Program" => String[], "Average # matched/app" => Float32[], "Target" => Int[], "Predicted" => Measurement{Float32}[], "Actual" => Int[])
 for progname in sort(collect(AdmissionsSimulation.program_abbrvs))
     global smatric, nmatric, tmatric
     papps = filter(app->app.program == progname, test_applicants)
     isempty(papps) && continue
-    nmatch, smatch = 0.0f0, 0.0f0
-    tnow = 0.0f0
-    for app in papps
+    nmatch = 0.0f0
+    ppmatrics = map(papps) do app
         like = match_likelihood(fmatch, past_applicants, app, tnow)
         slike = sum(like)
-        iszero(slike) && continue
         nmatch += slike
-        p = matriculation_probability(like, past_applicants)
-        smatch += p
+        matriculation_probability(like, past_applicants)
     end
+    pnmatrics = run_simulation(ppmatrics)
+    smatch = round1(mean(pnmatrics)) ± round1(std(pnmatrics))
     progkey = ProgramKey(progname, lastyear)
     pd = program_history[progkey]
-    println(progname,
-            ": mean # matched = ", nmatch/length(papps),
-            ", target = ", pd.target_raw,
-            ", estimated matriculation = ", smatch,
-            ", actual matriculation = ", pd.nmatriculants)
+    push!(startdf, (progname, round1(nmatch/length(papps)), pd.target_corrected, smatch, pd.nmatriculants))
+    # println(progname,
+    #         ": mean # matched = ", nmatch/length(papps),
+    #         ", target = ", pd.target_raw,
+    #         ", estimated matriculation = ", smatch,
+    #         ", actual matriculation = ", pd.nmatriculants)
     nmatch == 0 && continue
     smatric += smatch
-    tmatric += pd.target_raw
+    tmatric += pd.target_corrected
     nmatric += pd.nmatriculants
 end
+println("Predictions based on all offers made (including wait list), from the vantage point of the beginning of the season:")
+println(startdf)
 println("DBBS totals: target = $tmatric, estimated = $smatric, actual = $nmatric")
+# Simulate outcomes with and without wait list offers
+nmatrics_wl = run_simulation(pmatrics, 10^4)
+pmatrics_no_wl = copy(pmatrics)
+for i in eachindex(test_applicants, pmatrics_no_wl)
+    app = test_applicants[i]
+    if app.normofferdate > normdate(Date("2021-03-15"), program_history[ProgramKey(app)])
+        pmatrics_no_wl[i] = 0
+    end
+end
+nmatrics_no_wl = run_simulation(pmatrics_no_wl, 10^4)
 
 # Wait list analysis
 function future_offers(applicants, tnow::Date; program_history)
@@ -155,7 +199,7 @@ actual_yield = Dict(map(filter(pr -> pr.first.season == lastyear, collect(progra
     pk.program => pd.nmatriculants
 end)
 for tnow in (Date("$lastyear-03-15"), Date("$lastyear-04-01"))
-    local nmatric, progdata, pnames
+    local nmatric, progdata, pnames, ntarget
     nmatric, progstatus = wait_list_offers(fmatch, past_applicants, test_applicants, tnow; program_history, actual_yield)
     foffers = future_offers(test_applicants, tnow; program_history)
     pnames = sort(collect(keys(progstatus)))
@@ -165,7 +209,7 @@ for tnow in (Date("$lastyear-03-15"), Date("$lastyear-04-01"))
         status = progstatus[pname]
         progkey = ProgramKey(pname, year(tnow))
         progdata = program_history[progkey]
-        push!(datedf, (pname, progdata.target_corrected, status.nmatriculants, status.priority, get(foffers, pname, 0), progdata.nmatriculants, status.poutcome))
+        push!(datedf, (pname, progdata.target_corrected, status.nmatriculants, round(status.priority; digits=2), get(foffers, pname, 0), progdata.nmatriculants, status.poutcome))
         ntarget += progdata.target_corrected
     end
     println("\n\nOn $tnow, the target was $ntarget and the predicted inflow was $nmatric. Program-specific breakdown:")

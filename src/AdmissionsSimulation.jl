@@ -10,7 +10,7 @@ using ProgressMeter
 
 export ProgramKey, ProgramData, NormalizedApplicant
 export Outcome, ProgramYieldPrediction, offerdata, yielddata, program_similarity, cached_similarity
-export match_likelihood, match_function, matriculation_probability, select_applicant, net_probability, wait_list_offers
+export match_likelihood, match_function, matriculation_probability, run_simulation, select_applicant, net_loglike, wait_list_offers
 export normdate
 export read_program_history, read_applicant_data
 
@@ -270,6 +270,8 @@ The keyword arguments are the parameters controlling the similarity computation.
 ```math
 \\exp\\left(-\\frac{(s₁ - s₂)²}{2σ_\\text{sel}²} - \\frac{(y₁ - y₂)²}{2σ_\\text{yield}²}\\right).
 ```
+
+The output of this function can be cached with [`cached_similarity`](@ref).
 """
 function program_similarity(program1::AbstractString, program2::AbstractString;
                             σsel=Inf32, σyield=Inf32, offerdata, yielddata)
@@ -525,47 +527,64 @@ end
 
 ## Model training
 
-# Tune the match parameters to optimize accuracy of prediction
+llincrement(p, app::NormalizedApplicant) = llincrement(p, app.accept)
+llincrement(p, accept::Bool) = accept ? log(p) : -log(p)
 
-function net_probability(σsel::Real, σyield::Real, σr::Real, σt::Real;
-                         applicants, past_applicants, offerdata, yielddata,
-                         #= fraction of prior applicants that must match =# rmatch_floor=0.01)
+"""
+    net_loglike(σsel::Real, σyield::Real, σr::Real, σt::Real;
+                applicants, past_applicants, offerdata, yielddata,
+                minfrac=0.01)
+
+Compute the net log-likelihood for a list of `applicants`' matriculation decisions.
+This function is used to evaluate the accuracy of predictions made by specific model parameters.
+
+For applicant `j` with matriculation probability `pⱼ`, the net log-likelihood gets a
+contribution of `+log(pⱼ)` if the applicant accepted our offer of admission, and a
+contribution of `-log(pⱼ)` if the applicant declined. Consequently, this rewards predictions
+that accurately push `pⱼ` towards the extremes of 1 and 0.
+
+The `σ` arguments are matching parameters, see [`program_similarity`](@ref) and
+[`match_function`](@ref). [`offerdata`](@ref) and [`yielddata`](@ref) are computed
+by functions of the same name. `minfrac` expresses the minimum fraction of `past_applicants`
+allowed to be matched; any `test_applicant` matching fewer than these (in the sense of the
+sum of likelihoods computed by [`match_likelihood`](@ref)) leads to a return value of `-Inf`.
+"""
+function net_loglike(σsel::Real, σyield::Real, σr::Real, σt::Real;
+                     applicants, past_applicants, offerdata, yielddata,
+                     #= fraction of prior applicants that must match =# minfrac=0.01)
     progsim = cached_similarity(σsel, σyield; offerdata, yielddata)
     fmatch = match_function(; σr, σt, progsim)
-    cprob = 0.0f0
+    ll = 0.0f0
     for applicant in applicants
         like = match_likelihood(fmatch, past_applicants, applicant, 0.0f0)
-        sum(like) < rmatch_floor*length(past_applicants) && return -Inf32
+        sum(like) < minfrac*length(past_applicants) && return -Inf32
         p = matriculation_probability(like, past_applicants)
-        isnan(p) && continue
-        cprob += applicant.accept ? p : -p
+        ll += llincrement(p, applicant)
     end
-    return cprob
+    return ll
 end
 
 """
-    net_probability(σsels::AbstractVector, σyields::AbstractVector, σrs::AbstractVector, σts::AbstractVector;
-                    applicants, program_history)
+    net_loglike(σsels::AbstractVector, σyields::AbstractVector, σrs::AbstractVector, σts::AbstractVector;
+                applicants, program_history)
 
-Compute the net probability of prediction using historical data. For each year in `program_history` other than the earliest,
-use prior data to predict the probability of matriculation for each applicant. If `p` is the probability for a particular applicant,
-it contributes positively (`+p`) if the offer was accepted, and negatively (`-p`) if the offer was declined.
-Thus, successful prediction maximizes the net probability.
+Compute the prediction accuracy using historical data. For each year in `program_history` other than the earliest,
+use prior data to predict the probability of matriculation for each applicant.
 
 The `σ` lists contain the values that will be used to compute accuracy; the return value is a 4-dimensional array evaluating
-the net probability for all possible combinations of these parameters. `σsel` and `σyield` will be used by [`cached_similarity`](@ref)
+the net log-likelihood for all possible combinations of these parameters. `σsel` and `σyield` will be used by [`cached_similarity`](@ref)
 to determine program similarity; `σr` and `σs` will be used to measure applicant similarity.
 
 Tuning essentially corresponds to picking the index of the entry of the return value and then setting each parameter accordingly:
 
 ```julia
-np = net_probability(σsels, σyields, σrs, σts; applicants, program_history)
+np = net_loglike(σsels, σyields, σrs, σts; applicants, program_history)
 idx = argmax(np)
 σsel, σyield, σr, σt = σsels[idx[1]], σyields[idx[2]], σrs[idx[3]], σts[idx[4]]
 ```
 """
-function net_probability(σsels::AbstractVector, σyields::AbstractVector, σrs::AbstractVector, σts::AbstractVector;
-                         applicants, program_history, kwargs...)
+function net_loglike(σsels::AbstractVector, σyields::AbstractVector, σrs::AbstractVector, σts::AbstractVector;
+                     applicants, program_history, kwargs...)
     yrmin, yrmax = extrema(pk->pk.season, keys(program_history))
     cprob = zeros(Float32, length(σsels), length(σyields), length(σrs), length(σts))
     progress = Progress((yrmax - yrmin)*length(σrs)*length(σts); desc="Computing accuracy vs parameters for each year (progress slows in later years): ")
@@ -576,7 +595,7 @@ function net_probability(σsels::AbstractVector, σyields::AbstractVector, σrs:
         yd = yielddata(Tuple{Outcome,Outcome,Outcome}, prevapplicants)
         for k in eachindex(σrs), l in eachindex(σts)
             for i in eachindex(σsels), j in eachindex(σyields)
-                cprob[i,j,k,l] += net_probability(σsels[i], σyields[j], σrs[k], σts[l];
+                cprob[i,j,k,l] += net_loglike(σsels[i], σyields[j], σrs[k], σts[l];
                                                 applicants=yrapplicants, past_applicants=prevapplicants,
                                                 offerdata=od, yielddata=yd, kwargs...)
             end
