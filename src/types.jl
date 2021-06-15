@@ -185,3 +185,18 @@ struct ProgramYieldPrediction
     poutcome::Union{Float32,Missing}
 end
 ProgramYieldPrediction(nmatriculants, priority) = ProgramYieldPrediction(nmatriculants, priority, missing)
+
+struct FacultyInvolvement
+    program::String
+    ninterviews::Int
+    ncommittees::Int
+end
+Base.:+(fi1::FacultyInvolvement, fi2::FacultyInvolvement) = FacultyInvolvement(fi1.program, fi1.ninterviews + fi2.ninterviews, fi1.ncommittees + fi2.ncommittees)
+total(fi::FacultyInvolvement) = fi.ninterviews + 10*fi.ncommittees  # the factor of 10 credits the greater time commitment
+
+struct FacultyRecord
+    start::Date
+    contributions::Vector{FacultyInvolvement}
+end
+total(fr::FacultyRecord) = sum(total, fr.contributions; init=0)
+years(fr::FacultyRecord, yr=year(today())) = yr - year(fr.start) + 1

@@ -12,6 +12,43 @@ function countby(list)
 end
 
 @testset "AdmissionsSimulation.jl" begin
+    @testset "Targets" begin
+        # Test the "don't game the system" ethic
+        program_applicants = Dict("A" => 10, "B" => 10, "C" => 10)
+        fiis = Dict("A" => 2, "B" => 2, "C" => 2)
+        tgts1 = targets(program_applicants, fiis, 6)
+        @test all(pr -> pr.second ≈ 2, tgts1)
+        program_applicants2 = Dict("AB" => 20, "C" => 10)  # combine programs A and B
+        fiis = Dict("AB" => 4, "C" => 2)
+        tgts2 = targets(program_applicants2, fiis, 6)
+        @test tgts2["AB"] ≈ 4
+        @test tgts2["C"] ≈ 2
+        # A more realistic test that involves parsing etc
+        push!(AdmissionsSimulation.program_abbrvs, "A", "C")   # "B" already means the legacy Biochemistry program
+        facrecords = read_faculty_data(joinpath(@__DIR__, "data", "facultyinvolvement.csv"), ["A", "B", "C"])
+        pop!(AdmissionsSimulation.program_abbrvs, "A")
+        pop!(AdmissionsSimulation.program_abbrvs, "C")
+        @test facrecords["fac1"].contributions == [AdmissionsSimulation.FacultyInvolvement("A", 1, 0)]
+        @test facrecords["fac2"].contributions == [AdmissionsSimulation.FacultyInvolvement("B", 0, 1)]
+        @test facrecords["fac3"].contributions == [AdmissionsSimulation.FacultyInvolvement("C", 5, 2)]
+        @test facrecords["fac4"].contributions == [AdmissionsSimulation.FacultyInvolvement("A", 10, 0), AdmissionsSimulation.FacultyInvolvement("B", 1, 0)]
+        @test facrecords["fac5"].contributions == [AdmissionsSimulation.FacultyInvolvement("B", 0, 1), AdmissionsSimulation.FacultyInvolvement("C", 0, 1)]
+        @test facrecords["fac6"].contributions == [AdmissionsSimulation.FacultyInvolvement("A", 1, 0), AdmissionsSimulation.FacultyInvolvement("C", 1, 0)]
+        fiis = faculty_involvement(facrecords; yr=2021)
+        @test sum(last, fiis) ≈ 5   # fac1 is under threshold
+        @test fiis["A"] ≈ 10/11 + 1/2
+        @test fiis["B"] ≈ 1 + 1/11 + 1/2
+        @test fiis["C"] ≈ 1 + 1/2 + 1/2
+        tgts = targets(program_applicants, fiis, 5)
+        tnorm = 5 / (sqrt(10) * sum(sqrt ∘ last, fiis))
+        @test tgts["A"] ≈ tnorm * sqrt(10*fiis["A"])
+        @test tgts["B"] ≈ tnorm * sqrt(10*fiis["B"])
+        @test tgts["C"] ≈ tnorm * sqrt(10*fiis["C"])
+        fiis = faculty_involvement(facrecords; yr=2020)
+        @test sum(last, fiis) ≈ 6   # now fac1 is above threshold
+        @test fiis["A"] ≈ 1 + 10/11 + 1/2
+    end
+
     @testset "Matching and matriculation probability" begin
         program_history = Dict(ProgramKey("NS", 2021) => ProgramData(slots=15, napplicants=302, firstofferdate=Date("2021-01-13"), lastdecisiondate=Date("2021-04-15")),
                                ProgramKey("CB", 2021) => ProgramData(slots=5,  napplicants=160, firstofferdate=Date("2021-01-6"),  lastdecisiondate=Date("2021-04-15")),
