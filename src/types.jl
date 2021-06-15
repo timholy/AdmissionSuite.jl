@@ -185,3 +185,15 @@ struct ProgramYieldPrediction
     poutcome::Union{Float32,Missing}
 end
 ProgramYieldPrediction(nmatriculants, priority) = ProgramYieldPrediction(nmatriculants, priority, missing)
+
+struct FacultyInvolvement
+    program::String
+    ninterviews::Int
+    ncommittees::Int
+end
+
+struct FacultyRecord
+    start::Date
+    contributions::Vector{FacultyInvolvement}
+end
+years(fr::FacultyRecord, yr=year(today())) = yr - year(fr.start) + 1
