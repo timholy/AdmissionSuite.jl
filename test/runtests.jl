@@ -14,46 +14,38 @@ end
 @testset "AdmissionsSimulation.jl" begin
     @testset "Targets" begin
         # Test the "don't game the system" ethic
-        program_applicants = Dict("A" => 10, "B" => 10, "C" => 10)
-        fiis = Dict("A" => 2, "B" => 2, "C" => 2)
+        program_applicants = Dict("ATMP" => 10, "BTMP" => 10, "CTMP" => 10)
+        fiis = Dict("ATMP" => 2, "BTMP" => 2, "CTMP" => 2)
         tgts1 = targets(program_applicants, fiis, 6)
         @test all(pr -> pr.second ≈ 2, tgts1)
-        program_applicants2 = Dict("AB" => 20, "C" => 10)  # combine programs A and B
-        fiis = Dict("AB" => 4, "C" => 2)
+        program_applicants2 = Dict("AB" => 20, "CTMP" => 10)  # combine programs A and B
+        fiis = Dict("AB" => 4, "CTMP" => 2)
         tgts2 = targets(program_applicants2, fiis, 6)
         @test tgts2["AB"] ≈ 4
-        @test tgts2["C"] ≈ 2
+        @test tgts2["CTMP"] ≈ 2
         # A more realistic test that involves parsing etc
-        push!(AdmissionsSimulation.program_abbrvs, "A", "C")   # "B" already means the legacy Biochemistry program
-        facrecords = read_faculty_data(joinpath(@__DIR__, "data", "facultyinvolvement.csv"), ["A", "B", "C"])
-        pop!(AdmissionsSimulation.program_abbrvs, "A")
-        pop!(AdmissionsSimulation.program_abbrvs, "C")
-        @test facrecords["fac1"].contributions == [AdmissionsSimulation.FacultyInvolvement("A", 1, 0)]
-        @test facrecords["fac2"].contributions == [AdmissionsSimulation.FacultyInvolvement("B", 0, 1)]
-        @test facrecords["fac3"].contributions == [AdmissionsSimulation.FacultyInvolvement("C", 5, 2)]
-        @test facrecords["fac4"].contributions == [AdmissionsSimulation.FacultyInvolvement("A", 10, 0), AdmissionsSimulation.FacultyInvolvement("B", 1, 0)]
-        @test facrecords["fac5"].contributions == [AdmissionsSimulation.FacultyInvolvement("B", 0, 1), AdmissionsSimulation.FacultyInvolvement("C", 0, 1)]
-        @test facrecords["fac6"].contributions == [AdmissionsSimulation.FacultyInvolvement("A", 1, 0), AdmissionsSimulation.FacultyInvolvement("C", 1, 0)]
-        fiis = faculty_involvement(facrecords; yr=2021)
-        @test sum(last, fiis) ≈ 5   # fac1 is under threshold
-        @test fiis["A"] ≈ 10/11 + 1/2
-        @test fiis["B"] ≈ 1 + 1/11 + 1/2
-        @test fiis["C"] ≈ 1 + 1/2 + 1/2
+        program_applicants = Dict("BBSB" => 10, "BIDS" => 10, "HSG" => 10)
+        facrecords = read_faculty_data(joinpath(@__DIR__, "data", "facultyinvolvement.csv"))
+        @test facrecords["fac1"].contributions == [AdmissionsSimulation.FacultyInvolvement("B", 0, 1)]
+        @test facrecords["fac2"].contributions == [AdmissionsSimulation.FacultyInvolvement("BIDS", 2, 0)]
+        @test facrecords["fac3"].contributions == [AdmissionsSimulation.FacultyInvolvement("HSG", 5, 0)]
+        @test facrecords["fac4"].contributions == [AdmissionsSimulation.FacultyInvolvement("BIDS", 3, 0), AdmissionsSimulation.FacultyInvolvement("HSG", 3, 0)]
+        @test facrecords["fac5"].contributions == [AdmissionsSimulation.FacultyInvolvement("B", 0, 1), AdmissionsSimulation.FacultyInvolvement("HSG", 0, 1)]
+        @test facrecords["fac6"].contributions == [AdmissionsSimulation.FacultyInvolvement("B", 0, 1), AdmissionsSimulation.FacultyInvolvement("HSG", 3, 0)]
+        fiis = faculty_involvement(facrecords; yr=2021, iswarn=false)
+        @test sum(last, fiis) ≈ 5   # fac2 is under threshold
+        @test fiis["BBSB"] ≈ 1 + 1/2 + 10/13   # fac1, fac5, fac6
+        @test fiis["BIDS"] ≈ 6/9            # only fac4 contributes, but BIDS has been in existence only 1 year
+        @test fiis["HSG"] ≈ 1 + 3/9 + 1/2 + 3/13  # fac3, fac4, fac5, fac6
         tgts = targets(program_applicants, fiis, 5)
         tnorm = 5 / (sqrt(10) * sum(sqrt ∘ last, fiis))
-        @test tgts["A"] ≈ tnorm * sqrt(10*fiis["A"])
-        @test tgts["B"] ≈ tnorm * sqrt(10*fiis["B"])
-        @test tgts["C"] ≈ tnorm * sqrt(10*fiis["C"])
-        fiis = faculty_involvement(facrecords; yr=2020)
-        @test sum(last, fiis) ≈ 6   # now fac1 is above threshold
-        @test fiis["A"] ≈ 1 + 10/11 + 1/2
-        aggregate!(facrecords, ["B" => "A"])
-        @test facrecords["fac1"].contributions == [AdmissionsSimulation.FacultyInvolvement("A", 1, 0)]
-        @test facrecords["fac2"].contributions == [AdmissionsSimulation.FacultyInvolvement("A", 0, 1)]
-        @test facrecords["fac3"].contributions == [AdmissionsSimulation.FacultyInvolvement("C", 5, 2)]
-        @test facrecords["fac4"].contributions == [AdmissionsSimulation.FacultyInvolvement("A", 11, 0)]
-        @test facrecords["fac5"].contributions == [AdmissionsSimulation.FacultyInvolvement("C", 0, 1), AdmissionsSimulation.FacultyInvolvement("A", 0, 1)]
-        @test facrecords["fac6"].contributions == [AdmissionsSimulation.FacultyInvolvement("A", 1, 0), AdmissionsSimulation.FacultyInvolvement("C", 1, 0)]
+        @test tgts["BBSB"] ≈ tnorm * sqrt(10*fiis["BBSB"])
+        @test tgts["BIDS"] ≈ tnorm * sqrt(10*fiis["BIDS"])
+        @test tgts["HSG"] ≈ tnorm * sqrt(10*fiis["HSG"])
+        fiis = faculty_involvement(facrecords; yr=2021, normalize=false, iswarn=false)
+        @test fiis["BBSB"] ≈ 3   # fac1, fac5, fac6
+        @test fiis["BIDS"] ≈ 1   # fac4
+        @test fiis["HSG"] ≈ 2    # fac4, fac5
     end
 
     @testset "Matching and matriculation probability" begin

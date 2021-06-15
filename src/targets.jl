@@ -1,42 +1,4 @@
 """
-    aggregate!(faculty_engagement, mergepairs)
-
-Aggregate data for defunct programs into their successors.
-`faculty_engagement` can be read via [`read_faculty_data`](@ref).
-`mergepairs` is a list of `from=>to` pairs of program abbreviations.
-
-# Example
-
-To aggregate the defunct Biochemistry ("B") and Computational and Molecular Biophysics ("CMB") programs
-into their successor "BBSB", use
-```julia
-aggregate!(faculty_engagement, ["B"=>"BBSB", "CMB"=>"BBSB"])
-```
-"""
-function aggregate!(faculty_engagement, mergepairs)
-    todel = Int[]
-    for (_, facrec) in faculty_engagement
-        empty!(todel)
-        for (from, to) in mergepairs
-            for (i, contributioni) in enumerate(facrec.contributions)
-                if contributioni.program == from
-                    j = 1
-                    contributionj = facrec.contributions[j]
-                    while contributionj.program != to
-                        j += 1
-                        contributionj = checkbounds(Bool, facrec.contributions, j) ? facrec.contributions[j] : push!(facrec.contributions, FacultyInvolvement(to, 0, 0))[end]
-                    end
-                    facrec.contributions[j] = contributionj + contributioni
-                    push!(todel, i)
-                end
-            end
-        end
-        deleteat!(facrec.contributions, todel)
-    end
-    return faculty_engagement
-end
-
-"""
     fiis = faculty_involvement(faculty_engagement; annualthresh=1, yr=year(today()), normalize::Bool=true)
 
 Compute the Faculty Involvement Index (FII) for each program. `faculty_engagement` can be read via [`read_faculty_data`](@ref).
@@ -47,16 +9,40 @@ contributions are weighed from the year in which they were granted DBBS membersh
 `normalize=true` ensures "one faculty member, one vote" and is the recommended setting.
 When `false`, a faculty who participates in multiple programs counts multiple times.
 """
-function faculty_involvement(faculty_engagement; annualthresh=1, yr=year(today()), normalize::Bool=true)
+function faculty_involvement(faculty_engagement; annualthresh=2, yr=year(today()), yrstart=yr-4, normalize::Bool=true, show::Union{Bool,String}=false, subst=default_program_subst, iswarn::Bool=true)
     fiis = Dict{String,Float32}()
+    trange = yrstart:yr
+    anyshow = isa(show, Bool) ? show : true
+    qualified = Set{String}()
     for (facname, facrecord) in faculty_engagement
-        thresh = annualthresh * years(facrecord, yr)
-        tot = total(facrecord)
-        tot < thresh && continue
+        facyrs = intersect(year(facrecord.start):yr, trange)
+        thresh = annualthresh * length(facyrs)
+        @assert thresh > 0
+        tot = total(facrecord, facyrs)
+        tot <= thresh && continue
+        empty!(qualified)
+        anyshow && print(facname, ": ")
         for programfi in facrecord.contributions
-            prev = get!(fiis, programfi.program, 0.0f0)
-            fiis[programfi.program] = prev + (normalize ? total(programfi) / tot : total(programfi) >= thresh)
+            progcor = subst(programfi.program)
+            prev = get!(fiis, progcor, 0.0f0)
+            if iswarn && iszero(program_time_weight(facyrs, programfi.program))
+                @warn("$facname had a contribution that started before appointment date: $programfi")
+            end
+            if normalize
+                fii = total(programfi, facyrs) / tot
+                fiis[progcor] = prev + fii
+            else
+                fii = total(programfi, facyrs) > thresh
+                if fii
+                    if progcor ∉ qualified
+                        fiis[progcor] = prev + fii
+                        push!(qualified, progcor)
+                    end
+                end
+            end
+            anyshow && (isa(show, Bool) || programfi.program == show) && print(programfi, "=>", fii, " ")
         end
+        anyshow && println()
     end
     return fiis
 end

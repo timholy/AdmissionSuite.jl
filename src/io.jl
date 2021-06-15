@@ -50,7 +50,7 @@ function read_faculty_data(filename::AbstractString, args...)
     return read_faculty_data(rows, args...)
 end
 
-function read_faculty_data(rows, programs=keys(program_lookups))
+function read_faculty_data(rows, programs=sort(collect(keys(program_lookups))))
     function program_involvement(row, program)
         function int(n)
             n === missing && return 0
