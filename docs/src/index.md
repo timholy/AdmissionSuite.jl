@@ -7,7 +7,7 @@ CurrentModule = AdmissionsSimulation
 [AdmissionsSimulation](https://github.com/timholy/AdmissionsSimulation.jl) is designed to simulate outcomes of
 graduate admissions, with the intent of helping make decisions about both initial offers and wait-list offers.
 
-This package focuses on those students to whom offers of admission have been extended, and uses past applicants as proxies for current applicants to make predictions about whether they'll accept the offer. Because two "similar" students might end up making different final decisions, the recommended practice is to identify many different potential proxies and use the distribution of their decisions to simulate future outcomes.
+This package focuses on those students to whom offers of admission have been extended, and uses past applicants as proxies for current applicants to make predictions about whether they'll accept the offer. Because two "similar" students might end up making different final decisions, the recommended practice is to identify many different potential proxies and use the distribution of their decisions to simulate future outcomes.  This is similar to a [k-nearest neighbors](https://en.wikipedia.org/wiki/K-nearest_neighbors_algorithm) algorithm, but with continuous weights applied to each potential neighbor and no limit on the number of neighbors used.
 
 The inputs to this process are:
 - records on previous applicants
@@ -30,8 +30,7 @@ Let's imagine that the history of past admissions seasons looks like the first f
 The final column is specific to this particular "test" applicant--the one being made an offer in the current season whose response to the offer of admission is currently unknown--and must be recomputed for each current applicant we want to examine.
 The idea is that we look at all previous applicants who were also offered admission and assess similarity.
 In this table, 4 of the applicants are also from "program A."
-These, and particularly the applicant who was also the 2nd most highly-ranked applicant in her year with a similarity score of "1.0",
-are viewed as being especially similar to the test applicant.
+These are viewed as being especially similar to the test applicant, particularly the applicant who was also the 2nd most highly-ranked applicant in zir year (with a similarity score of "1.0").
 However, in this case our matching function also allows us to use "intelligence" from other programs,
 and so two applicants to "program B" have a small but nonzero similarity to the test applicant.
 
@@ -42,8 +41,8 @@ While each individual applicant must ultimately answer either yes or no,
 the fundamental thesis of this package is that having a per applicant matriculation probability can allow better control over class sizes
 through management of offer-extensions and wait-lists.
 
-The actual model is substantially more sophisticated than this.
-For example, in addition to the factors above, we incorporate the date on which past applicants informed us of their decision.
+The actual model incorporates more factors than shown in this simplified example.
+For example, we track the date on which each past applicant informed us of zir decision.
 This allows us to account for the ways in which both applicant and program competitiveness may interact to lead some applicants to respond immediately to our offer of admission and others to wait until the last day of the season (typically April 15th), with the reasons for delay also being coupled to the likelihood of accepting the offer of admission (e.g., more "yes" decisions arrive early and more "no" decisions arrive late).
 Accounting for these additional factors in our similarity computation improves accuracy in the projections for managing the wait list.
 
