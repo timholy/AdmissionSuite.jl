@@ -26,7 +26,7 @@ function aggregate!(faculty_engagement, mergepairs)
                         j += 1
                         contributionj = checkbounds(Bool, facrec.contributions, j) ? facrec.contributions[j] : push!(facrec.contributions, FacultyInvolvement(to, 0, 0))[end]
                     end
-                    contributionj += contributioni
+                    facrec.contributions[j] = contributionj + contributioni
                     push!(todel, i)
                 end
             end

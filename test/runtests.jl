@@ -47,6 +47,13 @@ end
         fiis = faculty_involvement(facrecords; yr=2020)
         @test sum(last, fiis) ≈ 6   # now fac1 is above threshold
         @test fiis["A"] ≈ 1 + 10/11 + 1/2
+        aggregate!(facrecords, ["B" => "A"])
+        @test facrecords["fac1"].contributions == [AdmissionsSimulation.FacultyInvolvement("A", 1, 0)]
+        @test facrecords["fac2"].contributions == [AdmissionsSimulation.FacultyInvolvement("A", 0, 1)]
+        @test facrecords["fac3"].contributions == [AdmissionsSimulation.FacultyInvolvement("C", 5, 2)]
+        @test facrecords["fac4"].contributions == [AdmissionsSimulation.FacultyInvolvement("A", 11, 0)]
+        @test facrecords["fac5"].contributions == [AdmissionsSimulation.FacultyInvolvement("C", 0, 1), AdmissionsSimulation.FacultyInvolvement("A", 0, 1)]
+        @test facrecords["fac6"].contributions == [AdmissionsSimulation.FacultyInvolvement("A", 1, 0), AdmissionsSimulation.FacultyInvolvement("C", 1, 0)]
     end
 
     @testset "Matching and matriculation probability" begin
