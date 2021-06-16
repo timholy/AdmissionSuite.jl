@@ -9,15 +9,15 @@ using Statistics
 using ProgressMeter
 
 # Types
-export ProgramKey, ProgramData, NormalizedApplicant, Outcome, ProgramYieldPrediction
+export ProgramKey, ProgramData, NormalizedApplicant, Outcome, ProgramYieldPrediction, Service, FacultyRecord
 # Targets
-export targets, faculty_involvement, aggregate!
+export faculty_affiliations, program_service, calibrate_service, faculty_effort, faculty_involvement, targets
 # Program similarity
 export offerdata, yielddata, program_similarity, cached_similarity
 # Applicant similarity & matriculation
 export match_likelihood, match_function, matriculation_probability, run_simulation, select_applicant, net_loglike, wait_list_analysis
 # Low-level utilities
-export normdate
+export normdate, aggregate
 # I/O
 export read_program_history, read_applicant_data, read_faculty_data
 

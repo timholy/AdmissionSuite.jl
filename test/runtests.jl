@@ -26,26 +26,111 @@ end
         # A more realistic test that involves parsing etc
         program_applicants = Dict("BBSB" => 10, "BIDS" => 10, "HSG" => 10)
         facrecords = read_faculty_data(joinpath(@__DIR__, "data", "facultyinvolvement.csv"))
-        @test facrecords["fac1"].contributions == [AdmissionsSimulation.FacultyInvolvement("B", 0, 1)]
-        @test facrecords["fac2"].contributions == [AdmissionsSimulation.FacultyInvolvement("BIDS", 2, 0)]
-        @test facrecords["fac3"].contributions == [AdmissionsSimulation.FacultyInvolvement("HSG", 5, 0)]
-        @test facrecords["fac4"].contributions == [AdmissionsSimulation.FacultyInvolvement("BIDS", 3, 0), AdmissionsSimulation.FacultyInvolvement("HSG", 3, 0)]
-        @test facrecords["fac5"].contributions == [AdmissionsSimulation.FacultyInvolvement("B", 0, 1), AdmissionsSimulation.FacultyInvolvement("HSG", 0, 1)]
-        @test facrecords["fac6"].contributions == [AdmissionsSimulation.FacultyInvolvement("B", 0, 1), AdmissionsSimulation.FacultyInvolvement("HSG", 3, 0)]
-        fiis = faculty_involvement(facrecords; yr=2021, iswarn=false)
-        @test sum(last, fiis) ≈ 5   # fac2 is under threshold
-        @test fiis["BBSB"] ≈ 1 + 1/2 + 10/13   # fac1, fac5, fac6
-        @test fiis["BIDS"] ≈ 6/9            # only fac4 contributes, but BIDS has been in existence only 1 year
-        @test fiis["HSG"] ≈ 1 + 3/9 + 1/2 + 3/13  # fac3, fac4, fac5, fac6
-        tgts = targets(program_applicants, fiis, 5)
-        tnorm = 5 / (sqrt(10) * sum(sqrt ∘ last, fiis))
-        @test tgts["BBSB"] ≈ tnorm * sqrt(10*fiis["BBSB"])
-        @test tgts["BIDS"] ≈ tnorm * sqrt(10*fiis["BIDS"])
-        @test tgts["HSG"] ≈ tnorm * sqrt(10*fiis["HSG"])
-        fiis = faculty_involvement(facrecords; yr=2021, normalize=false, iswarn=false)
-        @test fiis["BBSB"] ≈ 3   # fac1, fac5, fac6
-        @test fiis["BIDS"] ≈ 1   # fac4
-        @test fiis["HSG"] ≈ 2    # fac4, fac5
+        @test facrecords["fac1"].service == ["B" => Service(0, 1)]
+        @test facrecords["fac2"].service == ["BIDS" => Service(2, 0)]
+        @test facrecords["fac3"].service == ["HSG" => Service(5, 0)]
+        @test facrecords["fac4"].service == ["BIDS" => Service(3, 0), "HSG" => Service(3, 0)]
+        @test facrecords["fac5"].service == ["B" => Service(0, 1), "HSG" => Service(0, 1)]
+        @test facrecords["fac6"].service == ["B" => Service(0, 1), "HSG" => Service(3, 0)]
+        facrecords = AdmissionsSimulation.aggregate(facrecords, AdmissionsSimulation.default_program_substitutions)
+        progsvc = program_service(facrecords)
+        @test progsvc["BIDS"] == Service(5, 0)
+        @test progsvc["BBSB"] == Service(0, 3)
+        @test progsvc["HSG"] == Service(11, 1)
+        sc = calibrate_service(progsvc)
+        @test sc.c_per_i ≈ 1/11
+        @test AdmissionsSimulation.total(Service(1, 0), sc)  ≈ 11.1/11
+        @test AdmissionsSimulation.total(Service(0, 1), sc)  ≈ 11.1
+        @test AdmissionsSimulation.total(Service(11, 1), sc) ≈ 11.1       # we use max over interview and committees
+        @test AdmissionsSimulation.total(Service(12, 1), sc) ≈ 12/11 * 11.1
+        facs, progs, E = faculty_effort(facrecords, 2021:2021; sc)
+        fiis = Dict(zip(progs, faculty_involvement(E; scheme=:thresheffort)))
+        @test fiis["BBSB"] == 3
+        @test fiis["BIDS"] == 2
+        @test fiis["HSG"] == 4
+        fiis = Dict(zip(progs, faculty_involvement(E; annualthresh=5, scheme=:thresheffort)))
+        @test fiis["BBSB"] == 3
+        @test fiis["BIDS"] == 1   # now fac2 is under threshold
+        @test fiis["HSG"] == 4
+        # Now that we've tested it, everything is easier without `sc`
+        finaldate = Date("2021-12-31")  # set timer to end of 2021
+        daterange = Date("2021-01-01"):Day(1):finaldate
+        facs, progs, E = faculty_effort(facrecords, daterange; finaldate)
+        @test progs == ["BBSB", "BIDS", "HSG"]
+        @test E ≈ [10 0 0; 0 2 0; 0 0 5; 0 3 3; 10 0 10; 10 0 3]
+        fiis = Dict(zip(progs, faculty_involvement(E; annualthresh=2.001, scheme=:thresheffort)))
+        @test fiis["BBSB"] == 3
+        @test fiis["BIDS"] == 1
+        @test fiis["HSG"] == 4
+        fiis = Dict(zip(progs, faculty_involvement(E; annualthresh=2.001, scheme=:normeffort)))
+        @test fiis["BBSB"] ≈ 1 + 1/2 + 10/13
+        @test fiis["BIDS"] ≈ 1/2
+        @test fiis["HSG"] ≈ 1 + 1/2 + 1/2 + 3/13
+        fiis = Dict(zip(progs, faculty_involvement(E; annualthresh=5.001, scheme=:normeffort)))
+        @test fiis["BBSB"] ≈ 1 + 1/2 + 10/13
+        @test fiis["BIDS"] ≈ 1/2              # fac4: 3 hrs isn't enough to qualify on own, but sum is
+        @test fiis["HSG"] ≈ 1/2 + 1/2 + 3/13
+        fiis = Dict(zip(progs, faculty_involvement(E; scheme=:effortshare)))
+        @test fiis["BBSB"] ≈ 1 + 1/2 + 1
+        @test fiis["BIDS"] ≈ 2
+        @test fiis["HSG"] ≈ 1 + 1/2
+        # Degenerate case
+        fiis = Dict(zip(["A", "B"], faculty_involvement([0 0; 1 0]; scheme=:effortshare)))
+        @test fiis["A"] ≈ 1
+        @test fiis["B"] == 0
+        # Invariance against merge/split
+        # A cyclic effort matrix (4 faculty, 4 programs, 3 efforts)
+        newprogs = ("ProgA", "ProgB", "ProgC", "ProgD")
+        for prog in newprogs
+            AdmissionsSimulation.addprogram(prog)
+        end
+        facrecs = [(; :Faculty=>"fac1", Symbol("DBBS Approval Date")=> "01/02/2020", Symbol("Primary Program") => "ProgA", Symbol("Secondary Program") => "ProgB", Symbol("Tertiary Program") => "ProgC",
+                      Symbol("INTERVIEW ProgA") => 1, Symbol("INTERVIEW ProgB") => 1, Symbol("INTERVIEW ProgC") => 1),
+                   (; :Faculty=>"fac2", Symbol("DBBS Approval Date")=> "01/02/2020", Symbol("Primary Program") => "ProgB", Symbol("Secondary Program") => "ProgC", Symbol("Tertiary Program") => "ProgD",
+                      Symbol("INTERVIEW ProgB") => 1, Symbol("INTERVIEW ProgC") => 1, Symbol("INTERVIEW ProgD") => 1),
+                   (; :Faculty=>"fac3", Symbol("DBBS Approval Date")=> "01/02/2020", Symbol("Primary Program") => "ProgC", Symbol("Secondary Program") => "ProgD", Symbol("Tertiary Program") => "ProgA",
+                      Symbol("INTERVIEW ProgC") => 1, Symbol("INTERVIEW ProgD") => 1, Symbol("INTERVIEW ProgA") => 1),
+                   (; :Faculty=>"fac4", Symbol("DBBS Approval Date")=> "01/02/2020", Symbol("Primary Program") => "ProgD", Symbol("Secondary Program") => "ProgA", Symbol("Tertiary Program") => "ProgB",
+                      Symbol("INTERVIEW ProgD") => 1, Symbol("INTERVIEW ProgA") => 1, Symbol("INTERVIEW ProgB") => 1)]
+        facrecs = read_faculty_data(facrecs, ["ProgA", "ProgB", "ProgC", "ProgD"]; iswarn=false)
+        @test faculty_affiliations(facrecs) == Dict(prog=>1.0f0 for prog in newprogs)
+        @test faculty_affiliations(facrecs, :primary) == faculty_affiliations(facrecs, :normalized) == faculty_affiliations(facrecs, :weighted)
+        @test faculty_affiliations(facrecs, :all) == Dict(prog=>3.0f0 for prog in newprogs)
+        faculty, programs, E = faculty_effort(facrecs, 2020:2020)
+        @test faculty == ["fac1", "fac2", "fac3", "fac4"]
+        @test programs == [newprogs...]
+        @test E == [1 1 1 0; 0 1 1 1; 1 0 1 1; 1 1 0 1]
+        fiis = faculty_involvement(E)
+        @test fiis == [1, 1, 1, 1]
+        mergepairs = ["ProgA"=>"ProgABC", "ProgB"=>"ProgABC", "ProgC"=>"ProgABC"]
+        AdmissionsSimulation.addprogram("ProgABC")
+        aggrecs = AdmissionsSimulation.aggregate(facrecs, mergepairs)
+        @test faculty_affiliations(aggrecs, :primary) == Dict("ProgD"=>1, "ProgABC"=>3)               # good
+        @test faculty_affiliations(aggrecs, :all) == Dict("ProgD"=>3, "ProgABC"=>4)                   # bad
+        @test faculty_affiliations(aggrecs, :normalized) == Dict("ProgD"=>1.5, "ProgABC"=>2.5)        # bad
+        @test faculty_affiliations(aggrecs, :weighted) ==  Dict("ProgD"=>4/3.0f0, "ProgABC"=>8/3.0f0) # bad
+        _, programsagg, Eagg = faculty_effort(aggrecs, 2020:2020)
+        @test Eagg ≈ [3 0; 2 1; 2 1; 2 1]
+        fiis = Dict(zip(programsagg, faculty_involvement(Eagg)))
+        @test fiis["ProgD"] ≈ 1      # good
+        @test fiis["ProgABC"] ≈ 3    # good
+        # The next is bad
+        fiis = Dict(zip(programsagg, faculty_involvement(Eagg; scheme=:thresheffort, annualthresh=0.5)))
+        @test fiis["ProgD"] ≈ 3
+        @test fiis["ProgABC"] ≈ 4
+        # The naive effortshare is *really* bad, because everyone does service to ABC so the threshold is too high for 3/4
+        fiis = Dict(zip(programsagg, faculty_involvement(Eagg; scheme=:effortshare)))
+        @test fiis["ProgD"] ≈ 3
+        @test fiis["ProgABC"] ≈ 1
+        # But if we support there are more faculty not serving either, then we get a more reasonable (but still poor) result
+        fiis = Dict(zip(programsagg, faculty_involvement(Eagg; scheme=:effortshare, M=8)))
+        @test fiis["ProgD"] ≈ 3/2
+        @test fiis["ProgABC"] ≈ 5/2
+        @test_throws ArgumentError faculty_involvement(Eagg; scheme=:notascheme)
+        for prog in newprogs
+            AdmissionsSimulation.delprogram(prog)
+        end
+        AdmissionsSimulation.delprogram("ProgABC")
     end
 
     @testset "Matching and matriculation probability" begin

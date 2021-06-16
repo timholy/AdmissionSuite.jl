@@ -1,5 +1,7 @@
 ## I/O
 
+# These are quite specific to particular CSV formats and may need adaptation for changes
+
 """
     program_history = read_program_history(filename)
 
@@ -39,7 +41,7 @@ function read_applicant_data(filename::AbstractString; program_history)
 end
 
 """
-    faculty_engagement = read_faculty_data(filename)
+    facrecs = read_faculty_data(filename)
 
 Read faculty training participation from a file. See "$(@__DIR__)/test/data/facultyinvolvement.csv" for an example of the format.
 """
@@ -50,7 +52,7 @@ function read_faculty_data(filename::AbstractString, args...)
     return read_faculty_data(rows, args...)
 end
 
-function read_faculty_data(rows, programs=sort(collect(keys(program_lookups))))
+function read_faculty_data(rows, full_program_names=sort(collect(keys(program_lookups))); iswarn::Bool=true)
     function program_involvement(row, program)
         function int(n)
             n === missing && return 0
@@ -62,22 +64,32 @@ function read_faculty_data(rows, programs=sort(collect(keys(program_lookups))))
         ninterviews = int(get(row, Symbol("INTERVIEW $program"), 0))
         ncommittees = int(get(row, Symbol("THESIS CMTE $program"), 0))
         ninterviews == 0 && ncommittees == 0 && return nothing
-        return FacultyInvolvement(abbrv, ninterviews, ncommittees)
+        return abbrv => Service(ninterviews, ncommittees)
     end
     function program_involvement(row)
-        fis = FacultyInvolvement[]
-        for program in programs
+        fis = (eltype(fieldtype(FacultyRecord, :service)))[]
+        for program in full_program_names
             fi = program_involvement(row, program)
             fi === nothing && continue
             push!(fis, fi)
         end
         return fis
     end
+    function affiliations(row)
+        programs = String[]
+        for colname in ("Primary Program", "Secondary Program", "Tertiary Program")
+            nextprog = get(row, Symbol(colname), missing)
+            if nextprog !== missing && nextprog != "N/A"
+                push!(programs, validateprogram(nextprog))
+            end
+        end
+        return programs
+    end
 
     dfmt = dateformat"mm/dd/yyyy"
     return Dict(map(rows) do row
-        approval = row[Symbol("DBBS Approval Date")]
-        approval === missing && @warn("no approval date for $(row.Faculty)")
-        row.Faculty => FacultyRecord(approval === missing ? today() - Day(1) : Date(approval, dfmt), program_involvement(row))
+        approval = get(row, Symbol("DBBS Approval Date"), missing)
+        approval === missing && iswarn && @warn("no approval date for $(row.Faculty)")
+        row.Faculty => FacultyRecord(approval === missing ? today() - Day(1) : Date(approval, dfmt), affiliations(row), program_involvement(row))
     end)
 end
