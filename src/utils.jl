@@ -45,7 +45,35 @@ const program_range = Dict("B" => 2004:2017,
                            "PB" => 2004:2013,
                            "QHSG" => 2005:2007,
                            )
-default_program_subst(prog) = prog == "B" || prog == "CMB" ? "BBSB" : prog
+const default_program_substitutions = ["B" => "BBSB",
+                                       "CMB" => "BBSB",
+                                       "DB" => "DRSCB",
+                                       "PB" => "PMB"]
+function substitute(prog, subs)
+    for (from, to) in subs
+        prog == from && return to
+    end
+    return prog
+end
+
+function addprogram(prog)
+    push!(program_abbrvs, prog)
+    program_range[prog] = 0:year(today())
+    return
+end
+function delprogram(prog)
+    delete!(program_abbrvs, prog)
+    delete!(program_range, prog)
+    return
+end
+function merge_program_range!(progrange, subs)
+    for (from, to) in subs
+        rfrom, rto = progrange[from], progrange[to]
+        progrange[to] = min(minimum(rfrom), minimum(rto)):maximum(rto)
+        delete!(progrange, from)
+    end
+    return progrange
+end
 
 validateprogram(program::AbstractString) = program ∈ program_abbrvs ? String(program) : program_lookups[program]
 
@@ -70,10 +98,56 @@ applicant_score(rank::Missing, pdata) = rank
 season(date::Date) = year(date) + (month(date) > 7)
 season(applicant::NormalizedApplicant) = applicant.season
 
-program_time_weight(trange::UnitRange, program::AbstractString) = length(intersect(trange, program_range[program]))/length(trange)
+# program_time_weight(trange::UnitRange, program::AbstractString) = length(intersect(trange, program_range[program]))/length(trange)
 
 ratio0(a, b) = iszero(a) ? a/oneunit(b) : a/b
-total(fi::FacultyInvolvement, trange::UnitRange) = ratio0(fi.ninterviews, program_time_weight(trange, fi.program)) + 10*fi.ncommittees  # the factor of 10 credits the greater time commitment
-total(fr::FacultyRecord, trange::UnitRange) = sum(fr.contributions; init=0) do contrib
-    total(contrib, trange)
+# total((program, fi)::Pair{String,Service}, trange::UnitRange) = ratio0(fi.ninterviews, program_time_weight(trange, program)) + 10*fi.ncommittees  # the factor of 10 credits the greater time commitment
+# total(fr::FacultyRecord, trange::UnitRange) = sum(fr.service; init=0) do contrib
+#     total(contrib, trange)
+# end
+
+## aggregate
+
+"""
+    proghist = aggregate(program_history::ListPairs{ProgramKey, ProgramData}, mergepairs)
+
+Aggregate program history, merging program `from => to` pairs from `mergepairs`.
+"""
+function aggregate(program_history::ListPairs{ProgramKey, ProgramData}, mergepairs)
+    ph = Dict{ProgramKey, ProgramData}()
+    for (pk, pd) in program_history
+        pksubs = ProgramKey(substitute(pk.program, mergepairs), pk.season)
+        if !haskey(ph, pksubs)
+            ph[pksubs] = pd
+        else
+            ph[pksubs] += pd
+        end
+    end
+    return ph
+end
+
+function aggregate(facrec::FacultyRecord, mergepairs, covered=Set{String}())
+    empty!(covered)
+    progs = String[]
+    for prog in facrec.programs
+        sprog = substitute(prog, mergepairs)
+        sprog ∈ covered || push!(progs, sprog)
+        push!(covered, sprog)
+    end
+    service = Dict{String,Service}()
+    for (prog, s) in facrec.service
+        sprog = substitute(prog, mergepairs)
+        service[sprog] = get!(Service, service, sprog) + s
+    end
+    return FacultyRecord(facrec.start, progs, sort(collect(service); by=first))
+end
+
+"""
+    facrecsnew = aggregate(facrecs::ListPairs{String,FacultyRecord}, mergepairs)
+
+Aggregate faculty records, merging program `from => to` pairs from `mergepairs`.
+"""
+function aggregate(facrecs::ListPairs{String,FacultyRecord}, mergepairs)
+    covered = Set{String}()
+    return [name=>aggregate(facrec, mergepairs, covered) for (name, facrec) in facrecs]
 end
