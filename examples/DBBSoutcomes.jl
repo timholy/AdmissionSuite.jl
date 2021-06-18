@@ -4,6 +4,8 @@ using AdmissionsSimulation.ProgressMeter
 using Dates
 using Statistics
 
+substnan(A) = [isnan(a) ? oftype(a, -Inf) : a for a in A]
+
 ## Tune the matching function
 lastyear = maximum(pk -> pk.season, keys(program_history))
 test_applicants = filter(app->app.season == lastyear, applicants)
@@ -14,8 +16,8 @@ past_applicants = filter(app->app.season < lastyear, applicants)
 σyields = [0.01, 0.02, 0.05, 0.1, 0.2, 0.5]
 σrs = [0.01, 0.02, 0.05, 0.1, 0.2, 0.5]
 σts = [0.1, 0.2, 0.5, 1.0, 2.0]
-cprob = net_loglike(σsels, σyields, σrs, σts; applicants=past_applicants, program_history)
-idx = argmax(cprob)
+corarray = match_correlation(σsels, σyields, σrs, σts; applicants=past_applicants, program_history)
+idx = argmax(substnan(corarray))
 σsel, σyield, σr, σt = σsels[idx[1]], σyields[idx[2]], σrs[idx[3]], σts[idx[4]]
 
 # Now let's re-run the most recent season using proposed strategies
@@ -25,29 +27,29 @@ progsim = cached_similarity(σsel, σyield; offerdata=offerdat, yielddata=yieldd
 fmatch = match_function(; σr, σt, progsim)
 
 # First, test whether the matching function produces improved outcomes
-llfunc(pmatrics, applicants) = sum(AdmissionsSimulation.llincrement(p, app) for (p, app) in zip(pmatrics, applicants))
+accepts = [app.accept for app in test_applicants]
 pmatrics = map(test_applicants) do app
     like = match_likelihood(fmatch, past_applicants, app, 0.0)
     matriculation_probability(like, past_applicants)
 end
-llstar = llfunc(pmatrics, test_applicants)
-llshuffle = [llfunc(pmatrics[randperm(end)], test_applicants) for _ = 1:1000]
+cstar = cor(pmatrics, accepts)
+cshuffle = [cor(pmatrics[randperm(end)], accepts) for _ = 1:1000]
 println("% of simulations in which a particular matching function outperforms shuffled candidates:")
-println("  Full matching function vs. shuffled: $(mean(llstar .> llshuffle) * 100)%")
+println("  Full matching function vs. shuffled: $(mean(cstar .> cshuffle) * 100)%")
 fmatch_prog = match_function(; progsim)
 pmatrics_prog = map(test_applicants) do app
     like = match_likelihood(fmatch_prog, past_applicants, app, 0.0)
     matriculation_probability(like, past_applicants)
 end
-llstar_prog = llfunc(pmatrics_prog, test_applicants)
-println("  Matching with only program data (no individual data): $(mean(llstar_prog .> llshuffle) * 100)%")
+cstar_prog = cor(pmatrics_prog, accepts)
+println("  Matching with only program data (no individual data): $(mean(cstar_prog .> cshuffle) * 100)%")
 fmatch_ind = match_function(; σr, σt, progsim=(pa,pb)->true)
 pmatrics_ind = map(test_applicants) do app
     like = match_likelihood(fmatch_ind, past_applicants, app, 0.0)
     matriculation_probability(like, past_applicants)
 end
-llstar_ind = llfunc(pmatrics_ind, test_applicants)
-println("  Matching with only individual data (no program data): $(mean(llstar_ind .> llshuffle) * 100)%")
+cstar_ind = cor(pmatrics_ind, accepts)
+println("  Matching with only individual data (no program data): $(mean(cstar_ind .> cshuffle) * 100)%")
 println()
 
 # Next, analyze the admission season

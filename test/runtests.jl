@@ -252,6 +252,8 @@ end
     end
 
     @testset "Model training" begin
+        substnan(A) = [isnan(a) ? oftype(a, -Inf) : a for a in A]
+
         # Set up no overall difference among programs
         program_history = Dict{ProgramKey,ProgramData}()
         for prog in ("CB", "NS"), yr in 2019:2021
@@ -262,28 +264,28 @@ end
         σsels = σyields = σrs = σts = [0.01, Inf]
         # Case 1: rank is meaningful, nothing else is
         applicants = vec([NormalizedApplicant(; program=prog, rank=r, offerdate=od, decidedate=dd, accept=r>3, program_history) for prog in ("CB", "NS"), r in 1:6, od in offerdates, dd in decidedates])
-        np = net_loglike(σsels, σyields, σrs, σts; applicants, program_history, minfrac=0.25)
-        @test all(iszero, np[:,:,2,:])
-        @test isinf(np[1,1,1,1])
-        idx = argmax(np)
+        corarray = match_correlation(σsels, σyields, σrs, σts; applicants, program_history, minfrac=0.25)
+        @test all(iszero, corarray[:,:,2,:])
+        @test isnan(corarray[1,1,1,1])
+        idx = argmax(substnan(corarray))
         @test idx[3] == 1
         @test idx[4] == 2
         # Case 2: offer date is meaningful, nothing else is
         applicants = vec([NormalizedApplicant(; program=prog, rank=r, offerdate=od, decidedate=dd, accept=month(od)==1, program_history) for prog in ("CB", "NS"), r in 1:6, od in offerdates, dd in decidedates])
-        np = net_loglike(σsels, σyields, σrs, σts; applicants, program_history, minfrac=0.25)
-        @test isinf(np[1,1,1,1])
-        idx = argmax(np)
+        corarray = match_correlation(σsels, σyields, σrs, σts; applicants, program_history, minfrac=0.25)
+        @test isnan(corarray[1,1,1,1])
+        idx = argmax(substnan(corarray))
         @test idx[3] == 2
         @test idx[4] == 1
         # Case 3: program yield timing and rank are meaningful, nothing else is
         progmonth = Dict("CB" => 3, "NS" => 4)
         applicants = vec([NormalizedApplicant(; program=prog, rank=r, offerdate=od, decidedate=dd, accept=r>=progmonth[prog] && month(dd)==progmonth[prog], program_history) for prog in ("CB", "NS"), r in 1:6, od in offerdates, dd in decidedates])
-        np = net_loglike(σsels, σyields, σrs, σts; applicants, program_history, minfrac=0)
-        @test np[1,:,:,:] ≈ np[2,:,:,:]
-        @test np[:,:,:,1] ≈ np[:,:,:,2]
-        @test !(np[:,1,:,:] ≈ np[:,2,:,:])
-        @test !(np[:,:,1,:] ≈ np[:,:,2,:])
-        idx = argmax(np)
+        corarray = match_correlation(σsels, σyields, σrs, σts; applicants, program_history, minfrac=0)
+        @test corarray[1,:,:,:] ≈ corarray[2,:,:,:]
+        @test corarray[:,:,:,1] ≈ corarray[:,:,:,2]
+        @test !(corarray[:,1,:,:] ≈ corarray[:,2,:,:])
+        @test !(corarray[:,:,1,:] ≈ corarray[:,:,2,:])
+        idx = argmax(substnan(corarray))
         @test idx[2] == idx[3] == 1
         # Case 4: program selectivity and rank are meaningful, nothing else is
         progapps = Dict("CB" => 100, "NS" => 200)
@@ -291,12 +293,12 @@ end
             program_history[ProgramKey(prog, yr)] = ProgramData(slots=10, napplicants=progapps[prog], firstofferdate=Date("$yr-01-13"), lastdecisiondate=Date("$yr-04-15"))
         end
         applicants = vec([NormalizedApplicant(; program=prog, rank=r*progapps[prog]÷100, offerdate=od, decidedate=dd, accept=prog=="CB" ? isodd(r) : iseven(r), program_history) for prog in ("CB", "NS"), r in 1:6, od in offerdates, dd in decidedates])
-        np = net_loglike(σsels, σyields, σrs, σts; applicants, program_history, minfrac=0)
-        @test np[:,1,:,:] ≈ np[:,2,:,:]
-        @test np[:,:,:,1] ≈ np[:,:,:,2]
-        @test !(np[1,:,:,:] ≈ np[2,:,:,:])
-        @test !(np[:,:,1,:] ≈ np[:,:,2,:])
-        idx = argmax(np)
+        corarray = match_correlation(σsels, σyields, σrs, σts; applicants, program_history, minfrac=0)
+        @test corarray[:,1,:,:] ≈ corarray[:,2,:,:]
+        @test corarray[:,:,:,1] ≈ corarray[:,:,:,2]
+        @test !(corarray[1,:,:,:] ≈ corarray[2,:,:,:])
+        @test !(corarray[:,:,1,:] ≈ corarray[:,:,2,:])
+        idx = argmax(substnan(corarray))
         @test idx[1] == idx[3] == 1
     end
 

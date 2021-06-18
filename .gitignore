@@ -4,5 +4,6 @@
 /Manifest.toml
 /docs/build/
 /examples/*.csv
+/examples/*.xlsx
 /examples/*.pdf
 /examples/Manifest.toml
