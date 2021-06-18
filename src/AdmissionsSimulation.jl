@@ -15,7 +15,7 @@ export faculty_affiliations, program_service, calibrate_service, faculty_effort,
 # Program similarity
 export offerdata, yielddata, program_similarity, cached_similarity
 # Applicant similarity & matriculation
-export match_likelihood, match_function, matriculation_probability, run_simulation, select_applicant, net_loglike, wait_list_analysis
+export match_likelihood, match_function, matriculation_probability, run_simulation, select_applicant, match_correlation, wait_list_analysis
 # Low-level utilities
 export normdate, aggregate
 # I/O

@@ -88,4 +88,5 @@ for row in eachrow(df)
 end
 
 # Parse faculty data
-faculty_engagement = read_faculty_data("DBBS Formula 2021.csv")
+facrecs = read_faculty_data("DBBS Formula 2021.csv")
+facrecs = AdmissionsSimulation.aggregate(facrecs, AdmissionsSimulation.default_program_substitutions)

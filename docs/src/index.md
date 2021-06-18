@@ -118,8 +118,8 @@ See [`match_function`](@ref) for specific details.
 
 How does one tune these parameters? The core idea is to train them based on past admissions seasons: if you have
 records extending back several years, you make matriculation predictions for year ``y`` based on data from all years up to
-and including year ``y-1``, and then compute a "net log likelihood" based on the actual outcome.
-See [`net_loglike`](@ref) for details.
+and including year ``y-1``, and then compute a correlation with the actual outcome.
+See [`match_correlation`](@ref) for details.
 
 ## Analysis and simulations
 
