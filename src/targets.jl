@@ -45,7 +45,7 @@ function add_affiliations!(naffil, facrec::FacultyRecord, scheme::Symbol)
             add_affiliation!(naffil, facrec, i, weights[i]/W)
         end
     else
-        error("scheme ", scheme, " not recognized")
+        throw(ArgumentError("scheme $scheme not recognized"))
     end
     return naffil
 end

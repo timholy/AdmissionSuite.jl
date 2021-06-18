@@ -63,6 +63,7 @@ end
         @test progsvc["BBSB"] == Service(0, 3)
         @test progsvc["HSG"] == Service(11, 1)
         sc = calibrate_service(progsvc)
+        @test sc == calibrate_service(facrecords)
         @test sc.c_per_i ≈ 1/11
         @test AdmissionsSimulation.total(Service(1, 0), sc)  ≈ 11.1/11
         @test AdmissionsSimulation.total(Service(0, 1), sc)  ≈ 11.1
@@ -121,6 +122,7 @@ end
         @test faculty_affiliations(facrecs) == Dict(prog=>1.0f0 for prog in newprogs)
         @test faculty_affiliations(facrecs, :primary) == faculty_affiliations(facrecs, :normalized) == faculty_affiliations(facrecs, :weighted)
         @test faculty_affiliations(facrecs, :all) == Dict(prog=>3.0f0 for prog in newprogs)
+        @test_throws ArgumentError("scheme notascheme not recognized") faculty_affiliations(facrecs, :notascheme)
         faculty, programs, E = faculty_effort(facrecs, 2020:2020)
         @test faculty == ["fac1", "fac2", "fac3", "fac4"]
         @test programs == [newprogs...]

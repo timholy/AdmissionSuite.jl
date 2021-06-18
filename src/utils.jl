@@ -55,7 +55,6 @@ function substitute(prog, subs)
     end
     return prog
 end
-default_program_subst(prog) = substitute(prog, default_program_substitutions)
 
 function addprogram(prog)
     push!(program_abbrvs, prog)
@@ -99,13 +98,13 @@ applicant_score(rank::Missing, pdata) = rank
 season(date::Date) = year(date) + (month(date) > 7)
 season(applicant::NormalizedApplicant) = applicant.season
 
-program_time_weight(trange::UnitRange, program::AbstractString) = length(intersect(trange, program_range[program]))/length(trange)
+# program_time_weight(trange::UnitRange, program::AbstractString) = length(intersect(trange, program_range[program]))/length(trange)
 
 ratio0(a, b) = iszero(a) ? a/oneunit(b) : a/b
-total((program, fi)::Pair{String,Service}, trange::UnitRange) = ratio0(fi.ninterviews, program_time_weight(trange, program)) + 10*fi.ncommittees  # the factor of 10 credits the greater time commitment
-total(fr::FacultyRecord, trange::UnitRange) = sum(fr.service; init=0) do contrib
-    total(contrib, trange)
-end
+# total((program, fi)::Pair{String,Service}, trange::UnitRange) = ratio0(fi.ninterviews, program_time_weight(trange, program)) + 10*fi.ncommittees  # the factor of 10 credits the greater time commitment
+# total(fr::FacultyRecord, trange::UnitRange) = sum(fr.service; init=0) do contrib
+#     total(contrib, trange)
+# end
 
 ## aggregate
 
