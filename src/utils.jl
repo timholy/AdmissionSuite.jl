@@ -118,8 +118,11 @@ function aggregate(program_history::ListPairs{ProgramKey, ProgramData}, mergepai
     ph = Dict{ProgramKey, ProgramData}()
     for (pk, pd) in program_history
         pksubs = ProgramKey(substitute(pk.program, mergepairs), pk.season)
-        pdsubs = get!(ProgramData, ph, pksubs)
-        ph[pksubs] = pdsubs + pd
+        if !haskey(ph, pksubs)
+            ph[pksubs] = pd
+        else
+            ph[pksubs] += pd
+        end
     end
     return ph
 end

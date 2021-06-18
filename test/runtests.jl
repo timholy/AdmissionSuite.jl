@@ -12,6 +12,28 @@ function countby(list)
 end
 
 @testset "AdmissionsSimulation.jl" begin
+    @testset "aggregate" begin
+        AdmissionsSimulation.addprogram("OldA")
+        AdmissionsSimulation.addprogram("OldB")
+        AdmissionsSimulation.addprogram("NewA")
+        pd2019 = ProgramData(1, 2, 3, 4, today(), today())
+        pd2020 = ProgramData(5, 10, 15, 20, today(), today())
+        ph = Dict(ProgramKey("OldA", 2019) => pd2019,
+                  ProgramKey("NewA", 2020) => pd2020,)
+        pha = AdmissionsSimulation.aggregate(ph, ("OldA" => "NewA",))
+        @test pha[ProgramKey("NewA", 2020)] == pd2020
+        @test pha[ProgramKey("NewA", 2019)] == pd2019
+        ph = Dict(ProgramKey("OldA", 2019) => pd2019,
+                  ProgramKey("OldB", 2019) => pd2020,)
+        pha = AdmissionsSimulation.aggregate(ph, ("OldA" => "NewA", "OldB" => "NewA"))
+        pdc = pha[ProgramKey("NewA", 2019)]
+        for fn in (:target_raw, :target_corrected, :nmatriculants, :napplicants)
+            @test getfield(pdc, fn) == getfield(pd2019, fn) + getfield(pd2020, fn)
+        end
+        AdmissionsSimulation.delprogram("OldA")
+        AdmissionsSimulation.delprogram("OldB")
+        AdmissionsSimulation.delprogram("NewA")
+    end
     @testset "Targets" begin
         # Test the "don't game the system" ethic
         program_applicants = Dict("ATMP" => 10, "BTMP" => 10, "CTMP" => 10)
