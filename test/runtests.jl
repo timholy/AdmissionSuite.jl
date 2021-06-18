@@ -45,6 +45,9 @@ end
         tgts2 = targets(program_applicants2, fiis, 6)
         @test tgts2["AB"] ≈ 4
         @test tgts2["CTMP"] ≈ 2
+        tgts3 = targets(program_applicants2, fiis, 6, 3)
+        @test tgts3["AB"] ≈ 3
+        @test tgts3["CTMP"] ≈ 3
         # A more realistic test that involves parsing etc
         program_applicants = Dict("BBSB" => 10, "BIDS" => 10, "HSG" => 10)
         facrecords = read_faculty_data(joinpath(@__DIR__, "data", "facultyinvolvement.csv"))
