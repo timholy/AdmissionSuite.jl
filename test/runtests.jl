@@ -261,22 +261,22 @@ end
         end
         offerdates  = vec([Date("$yr-0$m-15") for yr in 2019:2021, m in 1:2])
         decidedates = vec([Date("$yr-0$m-15") for yr in 2019:2021, m in 3:4])
-        σsels = σyields = σrs = σts = [0.01, Inf]
+        σsels = σyields = σrs = σts = [Inf, 0.01]
         # Case 1: rank is meaningful, nothing else is
         applicants = vec([NormalizedApplicant(; program=prog, rank=r, offerdate=od, decidedate=dd, accept=r>3, program_history) for prog in ("CB", "NS"), r in 1:6, od in offerdates, dd in decidedates])
         corarray = match_correlation(σsels, σyields, σrs, σts; applicants, program_history, minfrac=0.25)
-        @test all(iszero, corarray[:,:,2,:])
-        @test isnan(corarray[1,1,1,1])
-        idx = argmax(substnan(corarray))
-        @test idx[3] == 1
-        @test idx[4] == 2
-        # Case 2: offer date is meaningful, nothing else is
-        applicants = vec([NormalizedApplicant(; program=prog, rank=r, offerdate=od, decidedate=dd, accept=month(od)==1, program_history) for prog in ("CB", "NS"), r in 1:6, od in offerdates, dd in decidedates])
-        corarray = match_correlation(σsels, σyields, σrs, σts; applicants, program_history, minfrac=0.25)
-        @test isnan(corarray[1,1,1,1])
+        @test all(iszero, corarray[:,:,1,:])
+        @test isnan(corarray[2,2,2,2])
         idx = argmax(substnan(corarray))
         @test idx[3] == 2
         @test idx[4] == 1
+        # Case 2: offer date is meaningful, nothing else is
+        applicants = vec([NormalizedApplicant(; program=prog, rank=r, offerdate=od, decidedate=dd, accept=month(od)==1, program_history) for prog in ("CB", "NS"), r in 1:6, od in offerdates, dd in decidedates])
+        corarray = match_correlation(σsels, σyields, σrs, σts; applicants, program_history, minfrac=0.25)
+        @test isnan(corarray[2,2,2,2])
+        idx = argmax(substnan(corarray))
+        @test idx[3] == 1
+        @test idx[4] == 2
         # Case 3: program yield timing and rank are meaningful, nothing else is
         progmonth = Dict("CB" => 3, "NS" => 4)
         applicants = vec([NormalizedApplicant(; program=prog, rank=r, offerdate=od, decidedate=dd, accept=r>=progmonth[prog] && month(dd)==progmonth[prog], program_history) for prog in ("CB", "NS"), r in 1:6, od in offerdates, dd in decidedates])
@@ -286,7 +286,7 @@ end
         @test !(corarray[:,1,:,:] ≈ corarray[:,2,:,:])
         @test !(corarray[:,:,1,:] ≈ corarray[:,:,2,:])
         idx = argmax(substnan(corarray))
-        @test idx[2] == idx[3] == 1
+        @test idx[2] == idx[3] == 2
         # Case 4: program selectivity and rank are meaningful, nothing else is
         progapps = Dict("CB" => 100, "NS" => 200)
         for prog in ("CB", "NS"), yr in 2019:2021
@@ -299,7 +299,7 @@ end
         @test !(corarray[1,:,:,:] ≈ corarray[2,:,:,:])
         @test !(corarray[:,:,1,:] ≈ corarray[:,:,2,:])
         idx = argmax(substnan(corarray))
-        @test idx[1] == idx[3] == 1
+        @test idx[1] == idx[3] == 2
     end
 
     @testset "Wait list" begin

@@ -1,29 +1,28 @@
 using PyPlot: PyPlot, plt
 using Colors
+using Distributions
 
-fig, ax = plt.subplots(1, 1; figsize=(5,3))
-ex_wl, ex_no_wl = extrema(nmatrics_wl), extrema(nmatrics_no_wl)
-nmrng = min(ex_wl[1], ex_no_wl[2]):max(ex_wl[1], ex_no_wl[2])
-ax.hist(nmatrics_wl, bins=nmrng, histtype="step")
-ax.hist(nmatrics_no_wl, bins=nmrng, histtype="step")
-ax.set_xlabel("# of matriculants")
-ax.set_ylabel("# of simulations")
-ax.legend(("all offers", "exclude waitlist"); fontsize="x-small", bbox_to_anchor=(1,1))
-fig.tight_layout()
-fig.savefig("outcome_distribution.pdf")
-
+# Program similarity
 pnames = setdiff(sort(collect(keys(yielddat))), ["B", "CMB"])  # remove outdated programs
-psim = [progsim(p1, p2) for p1 in pnames, p2 in pnames]
-fig, ax = plt.subplots(1, 1; figsize=(3,3))
-ax.imshow(psim)
-ax.set_xticks(0:length(pnames)-1)
-ax.set_yticks(0:length(pnames)-1)
-ax.set_xticklabels(pnames; rotation="vertical")
-ax.set_yticklabels(pnames)
+psim = [[progsim_pg(p1, p2) for p1 in pnames, p2 in pnames],
+        [progsim(p1, p2) for p1 in pnames, p2 in pnames]]
+fig, axs = plt.subplots(1, 2; figsize=(6,3))
+for (i, ax) in enumerate(axs)
+    ax.imshow(psim[i])
+    ax.set_xticks(0:length(pnames)-1)
+    ax.set_xticklabels(pnames; rotation="vertical")
+    if i == 1
+        ax.set_yticks(0:length(pnames)-1)
+        ax.set_yticklabels(pnames)
+    else
+        ax.set_yticks(1:0)
+    end
+
+end
 fig.tight_layout()
 fig.savefig("program_similarity.pdf")
 
-
+# Program comparison data
 cols = hex.(distinguishable_colors(length(pnames), [colorant"white"]; dropseed=true))
 fig, axs = plt.subplots(1, 2; figsize=(6,3))
 ax = axs[1]
@@ -60,10 +59,27 @@ ax.legend(lna, pnames; fontsize="x-small", bbox_to_anchor=(1,1))
 fig.tight_layout()
 fig.savefig("program_similarity_data.pdf")
 
+# Distribution of outcomes from vantage point of beginning of the season
+fig, ax = plt.subplots(1, 1; figsize=(5,3))
+ex_wl, ex_no_wl = extrema(nmatrics_wl), extrema(nmatrics_no_wl)
+nmrng = min(ex_wl[1], ex_no_wl[2]):max(ex_wl[1], ex_no_wl[2])
+h1 = ax.hist(nmatrics_wl, bins=nmrng, histtype="step")
+h2 = ax.hist(nmatrics_no_wl, bins=nmrng, histtype="step")
+ax.set_xlabel("# of matriculants")
+ax.set_ylabel("# of simulations")
+ax.legend(("all offers", "exclude waitlist"); fontsize="x-small", bbox_to_anchor=(1,1))
+ax.plot(nmrng, pdf.(Poisson(mean(nmatrics_wl)), nmrng) * length(nmatrics_wl), color=h1[3][1].get_edgecolor(), linestyle="dotted")
+ax.plot(nmrng, pdf.(Poisson(mean(nmatrics_no_wl)), nmrng) * length(nmatrics_no_wl), color=h2[3][1].get_edgecolor(), linestyle="dotted")
+fig.tight_layout()
+fig.savefig("outcome_distribution.pdf")
+
+# Waitlist dynamics
 fig, axs = plt.subplots(1, 3; figsize=(7,3))
 ax = axs[1]
 ex = extrema(dbbsnmatric)
-ax.hist(dbbsnmatric; bins=ex[begin]:ex[end])
+wlrng = ex[begin]:ex[end]
+h1 = ax.hist(dbbsnmatric; bins=wlrng, histtype="step")
+ax.plot(wlrng, pdf.(Poisson(mean(dbbsnmatric)), wlrng) * length(dbbsnmatric), color=h1[3][1].get_edgecolor(), linestyle="dotted")
 ax.set_xlabel("# of matriculants")
 ax.set_ylabel("# of simulations")
 ax = axs[2]
@@ -78,4 +94,19 @@ ax.set_xticks(0:length(dates)-1)
 ax.set_xticklabels(dates; rotation="vertical")
 ax.set_ylabel("Mean # offers extended")
 fig.tight_layout()
-fig.savefig("outcome_waitlist_distribution.pdf")
+fig.savefig("outcome_waitlist_distribution_$rankstate.pdf")
+
+# Faculty service (aggregate by program)
+totsvc = sort(collect(AdmissionsSimulation.program_service(facrecs)); by=first)
+prognames = first.(totsvc)
+ninterviews = map(pr->pr.second.ninterviews, totsvc)
+ncommittees = map(pr->pr.second.ncommittees, totsvc)
+fig, ax = plt.subplots(1, 1; figsize=(3,3))
+ax.scatter(ninterviews, ncommittees)
+for i = 1:length(prognames)
+    ax.annotate(prognames[i], (ninterviews[i], ncommittees[i]))
+end
+ax.set_xlabel("# interviews")
+ax.set_ylabel("# thesis committees")
+fig.tight_layout()
+fig.savefig("faculty_service.pdf")

@@ -4,27 +4,16 @@ using AdmissionsSimulation.ProgressMeter
 using Dates
 using Statistics
 
-substnan(A) = [isnan(a) ? oftype(a, -Inf) : a for a in A]
-
-## Tune the matching function
-lastyear = maximum(pk -> pk.season, keys(program_history))
-test_applicants = filter(app->app.season == lastyear, applicants)
-past_applicants = filter(app->app.season < lastyear, applicants)
-
-# Note the more combinations, the longer it takes
-σsels = [0.01, 0.02, 0.05, 0.1, 0.2, 0.5]
-σyields = [0.01, 0.02, 0.05, 0.1, 0.2, 0.5]
-σrs = [0.01, 0.02, 0.05, 0.1, 0.2, 0.5]
-σts = [0.1, 0.2, 0.5, 1.0, 2.0]
-corarray = match_correlation(σsels, σyields, σrs, σts; applicants=past_applicants, program_history)
-idx = argmax(substnan(corarray))
-σsel, σyield, σr, σt = σsels[idx[1]], σyields[idx[2]], σrs[idx[3]], σts[idx[4]]
+# include("parsedata.jl")
+# include("DBBStrain.jl")
 
 # Now let's re-run the most recent season using proposed strategies
 offerdat = offerdata(past_applicants, program_history)
 yielddat = yielddata(Tuple{Outcome,Outcome,Outcome}, past_applicants)
 progsim = cached_similarity(σsel, σyield; offerdata=offerdat, yielddata=yielddat)
 fmatch = match_function(; σr, σt, progsim)
+progsim_pg = cached_similarity(σsel_pg, σyield_pg; offerdata=offerdat, yielddata=yielddat)
+fmatch_pg = match_function(; progsim=progsim_pg)
 
 # First, test whether the matching function produces improved outcomes
 accepts = [app.accept for app in test_applicants]
@@ -42,7 +31,13 @@ pmatrics_prog = map(test_applicants) do app
     matriculation_probability(like, past_applicants)
 end
 cstar_prog = cor(pmatrics_prog, accepts)
-println("  Matching with only program data (no individual data): $(mean(cstar_prog .> cshuffle) * 100)%")
+println("  Matching with only chosen program data (no individual data): $(mean(cstar_prog .> cshuffle) * 100)%")
+pmatrics_pg = map(test_applicants) do app
+    like = match_likelihood(fmatch_pg, past_applicants, app, 0.0)
+    matriculation_probability(like, past_applicants)
+end
+cstar_pg = cor(pmatrics_pg, accepts)
+println("  Matching with only trained program data (no individual data): $(mean(cstar_pg .> cshuffle) * 100)%")
 fmatch_ind = match_function(; σr, σt, progsim=(pa,pb)->true)
 pmatrics_ind = map(test_applicants) do app
     like = match_likelihood(fmatch_ind, past_applicants, app, 0.0)

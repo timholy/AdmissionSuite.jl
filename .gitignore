@@ -6,4 +6,5 @@
 /examples/*.csv
 /examples/*.xlsx
 /examples/*.pdf
+/examples/*.tex
 /examples/Manifest.toml

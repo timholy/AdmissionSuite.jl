@@ -84,7 +84,9 @@ for row in eachrow(df)
     progname, dadmit, ddecide, accept, ishold = ret
     key = ProgramKey(progname, dadmit)
     po = program_offers[key]
-    push!(applicants, NormalizedApplicant(; program=progname, rank=(ishold ? po[1] : 1), offerdate=dadmit, decidedate=ddecide, accept=accept, program_history))
+    # rank = ishold ? po[1] : 1
+    # push!(applicants, NormalizedApplicant(; program=progname, rank, offerdate=dadmit, decidedate=ddecide, accept=accept, program_history))
+    push!(applicants, NormalizedApplicant(; program=progname, offerdate=dadmit, decidedate=ddecide, accept=accept, program_history))
 end
 
 # Parse faculty data
