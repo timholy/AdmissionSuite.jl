@@ -2,9 +2,11 @@
 AdmissionsSimulation = "e9cde6de-6074-429b-acec-d279973730fc"
 DataFrames = "a93c6f00-e57d-5684-b7b6-d8193f3e46c0"
 Dates = "ade2ca70-3891-5945-98fb-dc099432e06a"
+InvertedIndices = "41ab1584-1d38-5bbf-9106-f11c6c58b48f"
 LatexPrint = "d2208f48-c256-5759-9089-c25ed2a93924"
 PyPlot = "d330b81b-6aea-500a-939a-2ce795aea3ee"
 Statistics = "10745b16-79ce-11e8-11f9-7d13ad32a3b2"
+XLSX = "fdbf4ff8-1666-58a4-91e7-1b58723a45e0"
 
 [compat]
 DataFrames = "1"

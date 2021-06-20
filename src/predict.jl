@@ -115,10 +115,29 @@ end
 
 ## Model training
 
+function collect_predictions!(pmatrics::AbstractVector, accepts::AbstractVector{Bool},
+                              σsel::Real, σyield::Real, σr::Real, σt::Real;
+                              applicants, past_applicants, offerdata, yielddata,
+                              ptail=0.0f0,
+                              #= fraction of prior applicants that must match =# minfrac=0.0)
+    progsim = cached_similarity(σsel, σyield; offerdata, yielddata)
+    fmatch = match_function(; σr, σt, progsim)
+    nviolations = 0
+    for applicant in applicants
+        like = match_likelihood(fmatch, past_applicants, applicant, 0.0f0)
+        nviolations += sum(like) < minfrac*length(past_applicants)
+        p = matriculation_probability(like, past_applicants)
+        p = clamp(p, ptail, 1-ptail)
+        push!(pmatrics, p)
+        push!(accepts, applicant.accept)
+    end
+    return nviolations
+end
+
 """
     match_correlation(σsel::Real, σyield::Real, σr::Real, σt::Real;
                       applicants, past_applicants, offerdata, yielddata,
-                      ptail=0.05, minfrac=0.01)
+                      ptail=0.0f0, minfrac=0.0)
 
 Compute the correlation between estimated matriculation probability and decline/accept
 for a list of `applicants`' matriculation decisions.
@@ -132,21 +151,9 @@ between bounds, `clamp(pmatric, ptail, 1-ptail)`.
 allowed to be matched; any `test_applicant` matching fewer than these (in the sense of the
 sum of likelihoods computed by [`match_likelihood`](@ref)) leads to a return value of `NaN`.
 """
-function match_correlation(σsel::Real, σyield::Real, σr::Real, σt::Real;
-                           applicants, past_applicants, offerdata, yielddata,
-                           ptail=0.05f0,
-                           #= fraction of prior applicants that must match =# minfrac=0.01)
-    progsim = cached_similarity(σsel, σyield; offerdata, yielddata)
-    fmatch = match_function(; σr, σt, progsim)
+function match_correlation(σsel::Real, σyield::Real, σr::Real, σt::Real; kwargs...)
     pmatrics, accepts = Float32[], Bool[]
-    for applicant in applicants
-        like = match_likelihood(fmatch, past_applicants, applicant, 0.0f0)
-        sum(like) < minfrac*length(past_applicants) && return NaN32
-        p = matriculation_probability(like, past_applicants)
-        p = clamp(p, ptail, 1-ptail)
-        push!(pmatrics, p)
-        push!(accepts, applicant.accept)
-    end
+    iszero(collect_predictions!(pmatrics, accepts, σsel, σyield, σr, σt; kwargs...)) || return NaN32
     c = cor(pmatrics, accepts)
     return isnan(c) ? 0.0f0 : c
 end
@@ -172,26 +179,31 @@ idx = argmax(corarray)
 ```
 """
 function match_correlation(σsels::AbstractVector, σyields::AbstractVector, σrs::AbstractVector, σts::AbstractVector;
-                     applicants, program_history, kwargs...)
-    yrmin, yrmax = extrema(pk->pk.season, keys(program_history))
+                           applicants, program_history, kwargs...)
+    yrmin, yrmax = extrema(app->app.season, applicants)
     corarray = zeros(Float32, length(σsels), length(σyields), length(σrs), length(σts))
-    progress = Progress((yrmax - yrmin)*length(σrs)*length(σts); desc="Computing accuracy vs parameters for each year (progress slows in later years): ")
-    nyrs = 0
-    for yr = yrmin+1:yrmax
+    yeardata = map(yrmin+1:yrmax) do yr
         yrapplicants = filter(app -> app.season == yr, applicants)
         prevapplicants = filter(app -> app.season < yr, applicants)
-        isempty(yrapplicants) && continue
-        nyrs += 1
         od = offerdata(prevapplicants, program_history)
         yd = yielddata(Tuple{Outcome,Outcome,Outcome}, prevapplicants)
-        for k in eachindex(σrs), l in eachindex(σts)
-            for i in eachindex(σsels), j in eachindex(σyields)
-                corarray[i,j,k,l] += match_correlation(σsels[i], σyields[j], σrs[k], σts[l];
-                                                       applicants=yrapplicants, past_applicants=prevapplicants,
-                                                       offerdata=od, yielddata=yd, kwargs...)
+        return (yrapplicants, prevapplicants, od, yd)
+    end
+    @showprogress "Computing accuracy vs parameters" for k in eachindex(σrs), l in eachindex(σts)
+        σr, σt = σrs[k], σts[l]
+        for i in eachindex(σsels), j in eachindex(σyields)
+            σsel, σyield,  = σsels[i], σyields[j]
+            pmatrics, accepts = Float32[], Bool[]
+            nbad = 0
+            for (yr, yeardat) in zip(yrmin+1:yrmax, yeardata)
+                yrapplicants, prevapplicants, od, yd = yeardat
+                nbad += collect_predictions!(pmatrics, accepts, σsel, σyield, σr, σt;
+                                             applicants=yrapplicants, past_applicants=prevapplicants,
+                                             offerdata=od, yielddata=yd, kwargs...)
             end
-            ProgressMeter.next!(progress; showvalues=[(:yr, yr)])
+            c = cor(pmatrics, accepts)
+            corarray[i, j, k, l] = iszero(nbad) ? (isnan(c) ? 0.0f0 : c) : NaN32
         end
     end
-    return corarray/nyrs
+    return corarray
 end
