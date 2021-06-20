@@ -27,4 +27,13 @@ if isdefined(Main, :dfslots)
     open("mergeresults_table.tex", "w") do io
         tabular(io, mergeresults)
     end
+    open("napplicants_table.tex", "w") do io
+        tabular(io, dfnapplicants)
+    end
+end
+
+if isdefined(Main, :final_class)
+    open("final_class_table_rolling.tex", "w") do io
+        tabular(io, final_class)
+    end
 end

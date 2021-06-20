@@ -5,6 +5,7 @@ using Dates
 using Statistics
 using XLSX
 using InvertedIndices
+using DataFrames
 
 # Load data with "parsedata.jl" before running this
 # Also get the σ vectors from DBBStrain
@@ -36,7 +37,7 @@ rankedapplicants = filter(app->lastyear-1 <= app.season <= lastyear, applicants)
 ## Collect rank info
 xf2020 = XLSX.readxlsx("2019-2020-Rankings for Target formula.xlsx")
 xf2021 = XLSX.readxlsx("2020-2021-Rankings for Target formula.xlsx")
-prognames = unique((app->app.program).(rankedapplicants))
+prognames = sort(unique((app->app.program).(rankedapplicants)))
 scores = Dict{String,Tuple{Int,Int}}()
 for xf in (xf2020, xf2021)
     for prog in prognames
@@ -104,20 +105,48 @@ rankedapplicants = getapps(rankidx)
 test_applicants = filter(app -> app.season==lastyear, rankedapplicants)
 past_applicants = filter(app -> app.season< lastyear, rankedapplicants)
 
-# Exercise some of the offer machinery
-program_candidates = Dict{String, Vector{NormalizedApplicant}}()
-for app in test_applicants
-    list = get!(Vector{NormalizedApplicant}, program_candidates, app.program)
-    push!(list, app)
-end
-for (prog, list) in program_candidates
-    sort!(list; by=app->app.normrank)
-end
 offerdat = offerdata(past_applicants, program_history)
 yielddat = yielddata(Tuple{Outcome,Outcome,Outcome}, past_applicants)
 progsim = cached_similarity(σsel, σyield; offerdata=offerdat, yielddata=yielddat)
 fmatch = match_function(; σr, σt, progsim)
-program_offers = initial_offers(fmatch, program_candidates, past_applicants, Date("2021-01-01"); program_history)
+# Exercise some of the offer machinery
+newoffers = Dict{Float32,Vector{Int}}()
+for σthresh in (1, 2, 3)
+    program_candidates = Dict{String, Vector{NormalizedApplicant}}()
+    for app in test_applicants
+        list = get!(Vector{NormalizedApplicant}, program_candidates, app.program)
+        push!(list, app)
+    end
+    for (prog, list) in program_candidates
+        sort!(list; by=app->app.normrank)
+    end
+    program_offers = initial_offers(fmatch, program_candidates, past_applicants, Date("2021-01-01"), σthresh; program_history)
+    class_size_projection = Pair{Date,Measurement{Float32}}[]
+    offers = Pair{Date,Vector{String}}[]
+    for d in Date("2021-01-02"):Day(1):Date("2021-04-14")
+        lens = Dict(prog => length(list) for (prog, list) in program_offers)
+        push!(class_size_projection, d=>add_offers!(fmatch, program_offers, program_candidates, past_applicants, d, σthresh; program_history))
+        newoffers = String[]
+        for (prog, list) in program_offers
+            for _ = 1:length(list) -lens[prog]
+                push!(newoffers, prog)
+            end
+        end
+        push!(offers, d=>newoffers)
+    end
+    progoffers = Int[]
+    for prog in prognames
+        push!(progoffers, sum(app->app.accept, program_offers[prog]))
+    end
+    newoffers[σthresh] = progoffers
+end
+tgts, actuals = Int[], Int[]
+for prog in prognames
+    pd = program_history[ProgramKey(prog, 2021)]
+    push!(tgts, pd.target_corrected)
+    push!(actuals, pd.nmatriculants)
+end
+final_class = DataFrame("Program"=>prognames, "Target"=>tgts, "Actual"=>actuals, sort(["\$\\sigma_\\text{thresh}\$="*string(key)=>value for (key, value) in collect(newoffers)]; by=first)...)
 
 include("DBBSoutcomes.jl")
 

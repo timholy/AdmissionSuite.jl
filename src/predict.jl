@@ -113,12 +113,22 @@ function wait_list_analysis(fmatch::Function,
     return nmatric, progyields
 end
 
+"""
+    nmatric = add_offers!(fmatch, program_offers::Dict, program_candidates::Dict, past_applicants, tnow::Date=today(), σthresh=2; program_history)
+
+Transfer applicants from `program_candidates` to `program_offers` depending on whether projections in `nmatric` are below DBBS-wide
+target by at least `σthresh` standard deviations.  `nmatric` is computed upon entrance, and does not reflect updated projections after
+adding offers. `tnow` should be the date for which the computation should be performed, and is used to determine whether candidates
+have already informed us of their decision.
+
+Programs are prioritized for offers by the deficit divided by the expected noise.
+"""
 function add_offers!(fmatch::Function,
                      program_offers::Dict{String,<:AbstractVector{NormalizedApplicant}},
                      program_candidates::Dict{String,<:AbstractVector{NormalizedApplicant}},
                      past_applicants::AbstractVector{NormalizedApplicant},
-                     tnow::Date,
-                     σthresh::Real=1;
+                     tnow::Date=today(),
+                     σthresh::Real=2;
                      program_history)
     function calc_pmatric(applicant, pd = program_history[ProgramKey(applicant)])
         ntnow = normdate(tnow, pd)
@@ -142,7 +152,8 @@ function add_offers!(fmatch::Function,
         append!(allpmatrics, pmatrics)
     end
     nmatrics = run_simulation(allpmatrics, 1000)
-    mean(nmatrics) + σthresh * std(nmatrics) > target && return program_offers
+    nmatric = mean(nmatrics) ± std(nmatrics)
+    nmatric.val + σthresh * nmatric.err > target && return nmatric
     # Iteratively add candidates by program-priority
     pq = PriorityQueue{String,Float32}(Base.Order.Reverse)
     for (program, pmatrics) in ppmatrics
@@ -152,7 +163,8 @@ function add_offers!(fmatch::Function,
         pq[program] = priority(sum(pmatrics), tgt)
     end
     while true
-        program = dequeue!(pq)
+        program, p = dequeue_pair!(pq)
+        p < zero(p) && continue
         candidates = program_candidates[program]
         isempty(candidates) && continue
         applicant = popfirst!(candidates)
@@ -167,11 +179,18 @@ function add_offers!(fmatch::Function,
         nmatrics = run_simulation(allpmatrics, 1000)
         mean(nmatrics) + σthresh * std(nmatrics) > target && break
     end
-    return program_offers
+    return nmatric
 end
-function initial_offers(fmatch::Function, program_candidates::Dict, args...; kwargs...)
+
+"""
+    program_offers = initial_offers!(fmatch, program_candidates::Dict, past_applicants, tnow::Date=today(), σthresh=2; program_history)
+
+Allocate initial offers of admission at the beginning of the season.  See [`add_offers!`](@ref) for more information.
+"""
+function initial_offers!(fmatch::Function, program_candidates::Dict, args...; kwargs...)
     program_offers = Dict(program => NormalizedApplicant[] for program in keys(program_candidates))
-    return add_offers!(fmatch, program_offers, program_candidates, args...; kwargs...)
+    add_offers!(fmatch, program_offers, program_candidates, args...; kwargs...)
+    return program_offers
 end
 
 ## Model training
