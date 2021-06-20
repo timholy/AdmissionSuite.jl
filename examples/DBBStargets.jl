@@ -98,3 +98,15 @@ for subst in (["CSB"=>"CmteB", "DRSCB"=>"CmteB", "HSG"=>"CmteB", "MGG"=>"CmteB"]
         AdmissionsSimulation.delprogram(name)
     end
 end
+
+yrs = 2017:2021
+nappm = Vector{Union{Missing,Int}}(undef, length(yrs))
+fill!(nappm, missing)
+dfnapplicants = DataFrame("Year"=>yrs, (name=>copy(nappm) for name in names(dfslots) if name != "Scheme")...)
+for (pk, pd) in program_history
+    i = findfirst(isequal(pk.season), yrs)
+    i === nothing && continue
+    j = findfirst(isequal(pk.program), names(dfnapplicants))
+    j === nothing && continue
+    dfnapplicants[i,j] = pd.napplicants
+end

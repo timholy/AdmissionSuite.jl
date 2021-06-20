@@ -113,6 +113,86 @@ function wait_list_analysis(fmatch::Function,
     return nmatric, progyields
 end
 
+"""
+    nmatric = add_offers!(fmatch, program_offers::Dict, program_candidates::Dict, past_applicants, tnow::Date=today(), σthresh=2; program_history)
+
+Transfer applicants from `program_candidates` to `program_offers` depending on whether projections in `nmatric` are below DBBS-wide
+target by at least `σthresh` standard deviations.  `nmatric` is computed upon entrance, and does not reflect updated projections after
+adding offers. `tnow` should be the date for which the computation should be performed, and is used to determine whether candidates
+have already informed us of their decision.
+
+Programs are prioritized for offers by the deficit divided by the expected noise.
+"""
+function add_offers!(fmatch::Function,
+                     program_offers::Dict{String,<:AbstractVector{NormalizedApplicant}},
+                     program_candidates::Dict{String,<:AbstractVector{NormalizedApplicant}},
+                     past_applicants::AbstractVector{NormalizedApplicant},
+                     tnow::Date=today(),
+                     σthresh::Real=2;
+                     program_history)
+    function calc_pmatric(applicant, pd = program_history[ProgramKey(applicant)])
+        ntnow = normdate(tnow, pd)
+        applicant.normdecidedate <= ntnow && return Float32(applicant.accept)
+        like = match_likelihood(fmatch, past_applicants, applicant, ntnow)
+        return matriculation_probability(like, past_applicants)
+    end
+    # Compute the total target
+    season = year(tnow)
+    target = 0
+    for program in keys(program_candidates)
+        target += program_history[ProgramKey(program, season)].target_corrected
+    end
+    # Estimate our current class size
+    ppmatrics = Dict{String,Vector{Float32}}()
+    allpmatrics = Float32[]
+    for (program, list) in program_offers
+        pd = program_history[ProgramKey(program, season)]
+        pmatrics = calc_pmatric.(list, (pd,))
+        ppmatrics[program] = pmatrics
+        append!(allpmatrics, pmatrics)
+    end
+    nmatrics = run_simulation(allpmatrics, 1000)
+    nmatric = mean(nmatrics) ± std(nmatrics)
+    nmatric.val + σthresh * nmatric.err > target && return nmatric
+    # Iteratively add candidates by program-priority
+    pq = PriorityQueue{String,Float32}(Base.Order.Reverse)
+    for (program, pmatrics) in ppmatrics
+        pd = program_history[ProgramKey(program, season)]
+        tgt = pd.target_corrected
+        tgt == 0 && continue
+        pq[program] = priority(sum(pmatrics), tgt)
+    end
+    while true
+        program, p = dequeue_pair!(pq)
+        p < zero(p) && continue
+        candidates = program_candidates[program]
+        isempty(candidates) && continue
+        applicant = popfirst!(candidates)
+        push!(program_offers[program], applicant)
+        pmatric = calc_pmatric(applicant)
+        pmatrics = ppmatrics[program]
+        push!(pmatrics, pmatric)
+        push!(allpmatrics, pmatric)
+        pd = program_history[ProgramKey(program, season)]
+        tgt = pd.target_corrected
+        pq[program] = priority(sum(pmatrics), tgt)
+        nmatrics = run_simulation(allpmatrics, 1000)
+        mean(nmatrics) + σthresh * std(nmatrics) > target && break
+    end
+    return nmatric
+end
+
+"""
+    program_offers = initial_offers!(fmatch, program_candidates::Dict, past_applicants, tnow::Date=today(), σthresh=2; program_history)
+
+Allocate initial offers of admission at the beginning of the season.  See [`add_offers!`](@ref) for more information.
+"""
+function initial_offers!(fmatch::Function, program_candidates::Dict, args...; kwargs...)
+    program_offers = Dict(program => NormalizedApplicant[] for program in keys(program_candidates))
+    add_offers!(fmatch, program_offers, program_candidates, args...; kwargs...)
+    return program_offers
+end
+
 ## Model training
 
 function collect_predictions!(pmatrics::AbstractVector, accepts::AbstractVector{Bool},

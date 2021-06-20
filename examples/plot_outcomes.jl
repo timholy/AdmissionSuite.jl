@@ -110,3 +110,23 @@ ax.set_xlabel("# interviews")
 ax.set_ylabel("# thesis committees")
 fig.tight_layout()
 fig.savefig("faculty_service.pdf")
+
+if isdefined(@__MODULE__, :class_size_projection)
+    fig, ax = plt.subplots(1, 1)
+    d = first.(class_size_projection)
+    sz = last.(class_size_projection)
+    msz, σsz = (x->x.val).(sz), (x->x.err).(sz)
+    ax.errorbar(d, msz, yerr=σsz)
+    ax.set_xlabel("Date")
+    for lbl in ax.get_xticklabels()
+        lbl.set_rotation(90)
+    end
+    ax.set_ylabel("Projected class size")
+    for (i, (d, list)) in enumerate(offers)
+        if !isempty(list)
+            ax.annotate(string(length(list)), (d, msz[i]+σsz[i]+2), color="red")
+        end
+    end
+    fig.tight_layout()
+    fig.savefig("rolling_waitlist.pdf")
+end
