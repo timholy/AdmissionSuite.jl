@@ -104,6 +104,21 @@ rankedapplicants = getapps(rankidx)
 test_applicants = filter(app -> app.season==lastyear, rankedapplicants)
 past_applicants = filter(app -> app.season< lastyear, rankedapplicants)
 
+# Exercise some of the offer machinery
+program_candidates = Dict{String, Vector{NormalizedApplicant}}()
+for app in test_applicants
+    list = get!(Vector{NormalizedApplicant}, program_candidates, app.program)
+    push!(list, app)
+end
+for (prog, list) in program_candidates
+    sort!(list; by=app->app.normrank)
+end
+offerdat = offerdata(past_applicants, program_history)
+yielddat = yielddata(Tuple{Outcome,Outcome,Outcome}, past_applicants)
+progsim = cached_similarity(σsel, σyield; offerdata=offerdat, yielddata=yielddat)
+fmatch = match_function(; σr, σt, progsim)
+program_offers = initial_offers(fmatch, program_candidates, past_applicants, Date("2021-01-01"); program_history)
+
 include("DBBSoutcomes.jl")
 
 # offerdat = offerdata(past_applicants, program_history)

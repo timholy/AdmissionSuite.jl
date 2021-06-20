@@ -318,13 +318,34 @@ end
     @testset "Wait list" begin
         program_history = Dict{ProgramKey,ProgramData}()
         for prog in ("CB", "NS"), yr in 2019:2021
-            program_history[ProgramKey(prog, yr)] = ProgramData(slots=10, napplicants=100, firstofferdate=Date("$yr-01-13"), lastdecisiondate=Date("$yr-04-15"))
+            program_history[ProgramKey(prog, yr)] = ProgramData(slots=3, napplicants=100, firstofferdate=Date("$yr-01-13"), lastdecisiondate=Date("$yr-04-15"))
         end
         # Top-ranked applicants decline late, lower-ranked applicants accept early
-        applicants = vec([NormalizedApplicant(; program=prog, rank=r, offerdate=Date("$yr-01-13"), decidedate=r>3 ? Date("$yr-01-15") : Date("$yr-04-15"), accept=r>3+(prog=="NS")-(yr==2019), program_history) for prog in ("CB", "NS"), r in 1:6, yr in 2019:2021])
+        applicants = vec([NormalizedApplicant(; program=prog, rank=r, offerdate=Date("$yr-01-13"), decidedate=r>3 ? Date("$yr-01-15") : Date("$yr-04-15"), accept=r>3+(prog=="NS")-(yr==2019), program_history) for prog in ("CB", "NS"), r in 1:7, yr in 2019:2021])
         past_applicants = filter(app -> app.season  < 2021, applicants)
         test_applicants = filter(app -> app.season == 2021, applicants)
         fmatch = match_function(; σr=0.0001f0)
+        ## Sending out offers
+        program_candidates = Dict(map(("CB", "NS")) do prog
+            list = sort!(filter(app->app.program == prog, test_applicants); by=app->app.normrank)
+            prog => list
+            # # Add one more applicant
+            # prog => push!(list, NormalizedApplicant(; program=prog, rank=7, offerdate=Date("2021-01-13"), decidedate=Date("2021-01-20"), accept=true, program_history))
+        end)
+        program_offers = initial_offers(fmatch, program_candidates, past_applicants, Date("2021-01-01"), 0.25; program_history)
+        @test all(list -> length(list) == 6, values(program_offers))
+        @test all(list -> length(list) == 1, values(program_candidates))
+        # By 1/16, many decisions would have been rendered. CB got all 3, NS got 2.
+        add_offers!(fmatch, program_offers, program_candidates, past_applicants, Date("2021-01-16"), 0.25; program_history)
+        @test length(program_offers["NS"]) == 7
+        @test length(program_offers["CB"]) == 6
+        @test length(program_candidates["NS"]) == 0
+        @test length(program_candidates["CB"]) == 1
+
+        ## Analyzing wait list
+        applicants = vec([NormalizedApplicant(; program=prog, rank=r, offerdate=Date("$yr-01-13"), decidedate=r>3 ? Date("$yr-01-15") : Date("$yr-04-15"), accept=r>3+(prog=="NS")-(yr==2019), program_history) for prog in ("CB", "NS"), r in 1:6, yr in 2019:2021])
+        past_applicants = filter(app -> app.season  < 2021, applicants)
+        test_applicants = filter(app -> app.season == 2021, applicants)
         actual_yield = Dict("CB" => 3, "NS" => 0)
         nmatric, progstatus = wait_list_analysis(fmatch, past_applicants, test_applicants, Date("2021-01-13"); program_history, actual_yield)
         @test nmatric ≈ 6
