@@ -12,7 +12,7 @@ using ProgressMeter
 # Types
 export ProgramKey, ProgramData, NormalizedApplicant, Outcome, ProgramYieldPrediction, Service, FacultyRecord
 # Targets
-export faculty_affiliations, program_service, calibrate_service, faculty_effort, faculty_involvement, targets, initial_offers, add_offers!
+export faculty_affiliations, program_service, calibrate_service, faculty_effort, faculty_involvement, targets, initial_offers!, add_offers!
 # Program similarity
 export offerdata, yielddata, program_similarity, cached_similarity
 # Applicant similarity & matriculation

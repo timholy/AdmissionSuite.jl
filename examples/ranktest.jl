@@ -120,7 +120,7 @@ for σthresh in (1, 2, 3)
     for (prog, list) in program_candidates
         sort!(list; by=app->app.normrank)
     end
-    program_offers = initial_offers(fmatch, program_candidates, past_applicants, Date("2021-01-01"), σthresh; program_history)
+    program_offers = initial_offers!(fmatch, program_candidates, past_applicants, Date("2021-01-01"), σthresh; program_history)
     class_size_projection = Pair{Date,Measurement{Float32}}[]
     offers = Pair{Date,Vector{String}}[]
     for d in Date("2021-01-02"):Day(1):Date("2021-04-14")

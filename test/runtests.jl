@@ -332,7 +332,7 @@ end
             # # Add one more applicant
             # prog => push!(list, NormalizedApplicant(; program=prog, rank=7, offerdate=Date("2021-01-13"), decidedate=Date("2021-01-20"), accept=true, program_history))
         end)
-        program_offers = initial_offers(fmatch, program_candidates, past_applicants, Date("2021-01-01"), 0.25; program_history)
+        program_offers = initial_offers!(fmatch, program_candidates, past_applicants, Date("2021-01-01"), 0.25; program_history)
         @test all(list -> length(list) == 6, values(program_offers))
         @test all(list -> length(list) == 1, values(program_candidates))
         # By 1/16, many decisions would have been rendered. CB got all 3, NS got 2.
