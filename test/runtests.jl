@@ -341,6 +341,14 @@ end
         @test length(program_offers["CB"]) == 6
         @test length(program_candidates["NS"]) == 0
         @test length(program_candidates["CB"]) == 1
+        # Using random applicants. This is useful for setting the initial number of accepts.
+        # The following test assumes σt = Inf (as it is above)
+        fake_candidates1 = generate_fake_candidates(program_history, 2021)
+        fake_offers1 = initial_offers!(fmatch, fake_candidates1, past_applicants, Date("2021-01-01"); program_history)
+        fake_candidates2 = generate_fake_candidates(program_history, 2021, Dict("CB" => Date.(["2021-01-13", "2021-02-02"])))
+        fake_offers2 = initial_offers!(fmatch, fake_candidates2, past_applicants, Date("2021-01-01"); program_history)
+        dictcount(d) = Dict(key=>length(val) for (key,val) in d)
+        @test dictcount(fake_offers1) == dictcount(fake_offers2)
 
         ## Analyzing wait list
         applicants = vec([NormalizedApplicant(; program=prog, rank=r, offerdate=Date("$yr-01-13"), decidedate=r>3 ? Date("$yr-01-15") : Date("$yr-04-15"), accept=r>3+(prog=="NS")-(yr==2019), program_history) for prog in ("CB", "NS"), r in 1:6, yr in 2019:2021])

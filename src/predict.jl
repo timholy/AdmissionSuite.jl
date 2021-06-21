@@ -132,7 +132,7 @@ function add_offers!(fmatch::Function,
                      program_history)
     function calc_pmatric(applicant, pd = program_history[ProgramKey(applicant)])
         ntnow = normdate(tnow, pd)
-        applicant.normdecidedate <= ntnow && return Float32(applicant.accept)
+        applicant.normdecidedate !== missing && applicant.normdecidedate <= ntnow && return Float32(applicant.accept)
         like = match_likelihood(fmatch, past_applicants, applicant, ntnow)
         return matriculation_probability(like, past_applicants)
     end
@@ -186,6 +186,8 @@ end
     program_offers = initial_offers!(fmatch, program_candidates::Dict, past_applicants, tnow::Date=today(), σthresh=2; program_history)
 
 Allocate initial offers of admission at the beginning of the season.  See [`add_offers!`](@ref) for more information.
+See also [`generate_fake_candidates`](@ref) to plan offers in cases where some programs want to make their initial offers
+before other programs have finished interviewing.
 """
 function initial_offers!(fmatch::Function, program_candidates::Dict, args...; kwargs...)
     program_offers = Dict(program => NormalizedApplicant[] for program in keys(program_candidates))
