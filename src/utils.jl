@@ -151,3 +151,57 @@ function aggregate(facrecs::ListPairs{String,FacultyRecord}, mergepairs)
     covered = Set{String}()
     return [name=>aggregate(facrec, mergepairs, covered) for (name, facrec) in facrecs]
 end
+
+"""
+    program_candidates = generate_fake_candidates(program_history, season::Integer, program_offer_dates=nothing)
+
+Generate fake candidates for each program, each ranked starting from 1. `season` is the year for which the offers
+should be generated. Optionally provide `program_offer_dates`, a `program_name=>list_of_offer_dates` dictionary
+which will be used to generate offer dates (by default set to the `firstofferdate` in `program_history`).
+Unless `σt` is quite small in the matching function, adding additional offer dates (e.g., for multiple interview dates)
+may not change the outcome substantially.
+
+On output, `program_candidates` is a `Dict(program1=>[applicant1a, applicant1b, ...], ...)` storing the fake applicants
+per program in rank order. See [`initial_offers`](@ref).
+
+# Example
+
+This calculates the number of initial offers per program:
+
+```
+julia> program_candidates = AdmissionsSimulation.generate_fake_candidates(program_history, 2021);
+
+julia> program_offers = initial_offers!(fmatch, program_candidates, past_applicants, Date("2021-01-01"); program_history);
+
+julia> noffers = sort([prog => length(list) for (prog, list) in program_offers]; by=first)
+13-element Vector{Pair{String, Int64}}:
+  "BBSB" => 16
+  "BIDS" => 9
+    "CB" => 13
+   "CSB" => 14
+ "DRSCB" => 14
+  "EEPB" => 12
+   "HSG" => 9
+   "IMM" => 16
+   "MCB" => 16
+   "MGG" => 18
+  "MMMP" => 18
+    "NS" => 31
+   "PMB" => 14
+```
+"""
+function generate_fake_candidates(program_history::ListPairs{ProgramKey,ProgramData}, season::Integer,
+                                  program_offer_dates=nothing)
+    randchoice(ds) = isa(ds, Date) ? ds : rand(ds)::Date
+
+    program_candidates = Dict{String,Vector{NormalizedApplicant}}()
+    for (pk, pd) in program_history
+        pk.season == season || continue
+        program_candidates[pk.program] = map(1:pd.napplicants) do r
+            NormalizedApplicant(; program=pk.program, rank=r,
+                                  offerdate=program_offer_dates === nothing ? pd.firstofferdate : randchoice(get(program_offer_dates, pk.program, pd.firstofferdate)),
+                                  program_history)
+        end
+    end
+    return program_candidates
+end

@@ -18,7 +18,7 @@ export offerdata, yielddata, program_similarity, cached_similarity
 # Applicant similarity & matriculation
 export match_likelihood, match_function, matriculation_probability, run_simulation, select_applicant, match_correlation, wait_list_analysis
 # Low-level utilities
-export normdate, aggregate
+export normdate, aggregate, generate_fake_candidates
 # I/O
 export read_program_history, read_applicant_data, read_faculty_data
 
