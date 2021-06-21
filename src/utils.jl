@@ -162,7 +162,7 @@ Unless `σt` is quite small in the matching function, adding additional offer da
 may not change the outcome substantially.
 
 On output, `program_candidates` is a `Dict(program1=>[applicant1a, applicant1b, ...], ...)` storing the fake applicants
-per program in rank order. See [`initial_offers`](@ref).
+per program in rank order. See [`initial_offers!`](@ref).
 
 # Example
 

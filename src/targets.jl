@@ -8,14 +8,14 @@ pairs containing details about the affiliations of each faculty member (see [`Fa
 `facrecs` can be read via [`read_faculty_data`](@ref).
 
 `scheme` controls the weighting of affiliations for faculty members with more than one affiliation:
-- `:primary`: count only the faculty member's primary affiliation (one vote/faculty)
+- `:primary` (default): count only the faculty member's primary affiliation (one vote/faculty)
 - `:all`: count all affiliations (multiple votes/faculty depending on the number of affiliations)
 - `:normalized`: one vote per faculty, spread equally among all that faculty member's affiliations
 - `:weighted`: one vote per faculty, with decreasing weight. For a faculty member with 3 affiliations,
   they would be assigned a ratio of 3 to 2 to 1.  Hence the primary program would get 3/6=0.5,
   secondary 2/6=0.33, and tertiary 1/6=0.17.
 """
-function faculty_affiliations(facrecs::ListPairs{String,FacultyRecord}, scheme::Symbol=:normalized)
+function faculty_affiliations(facrecs::ListPairs{String,FacultyRecord}, scheme::Symbol=:primary)
     naffil = Dict{String,Float32}()
     for (_, facrec) in facrecs
         add_affiliations!(naffil, facrec, scheme)
@@ -79,7 +79,7 @@ end
 
 Calculate an equivalence between different forms of service.
 This is to handle the fact that young programs don't provide opportunities for service in the form of thesis commmittees.
-`progsvc` is from [`program-service`](@ref), and `yrthresh` selects "old" programs (ones that existed prior to `yrthresh`)
+`progsvc` is from [`program_service`](@ref), and `yrthresh` selects "old" programs (ones that existed prior to `yrthresh`)
 useful for calibration.
 
 `sc` allows a calculation of total service based on the maximum score computed from interviews or from committees.
@@ -194,7 +194,7 @@ Each program gets weighted by the geometric mean of the # of applicants and FII.
 function targets(program_applicants, fiis, N)
     weights = Float32[]
     for (program, napplicants) in program_applicants
-        push!(weights, sqrt(napplicants * fiis[program]))
+        push!(weights, sqrt(napplicants * get(fiis, program, zero(valtype(fiis)))))
     end
     W = sum(weights)
     tgts = Dict{String,Float32}()
