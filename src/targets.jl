@@ -122,7 +122,7 @@ function faculty_effort(facrecs::ListPairs{String,FacultyRecord},
                         daterange::AbstractRange{<:Union{Integer,Date}};
                         sc=nothing,
                         progyears=merge_program_range!(copy(program_range), default_program_substitutions),
-                        finaldate=today())
+                        finaldate=lastday(last(daterange)))
     # Determine all the counted programs and all the counted faculty
     ufacs, uprogs = Set{String}(), Set{String}()
     for (key, facrec) in facrecs
@@ -150,6 +150,8 @@ function faculty_effort(facrecs::ListPairs{String,FacultyRecord},
     end
     return ufacs, uprogs, E
 end
+lastday(d::Date) = d
+lastday(yr::Integer) = min(today(), Date(yr, 12, 31))
 
 """
     f = faculty_involvement(E::AbstractMatrix; scheme=:normeffort, annualthresh=2, M=size(E,1))

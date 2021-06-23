@@ -37,6 +37,7 @@ Dict{String, Float32} with 2 entries:
   "EEPB" => 1.0
   "BBSB" => 1.0
 ```
+The two faculty members had primary affiliations of BBSB and EEPB, respectively, so each gets counted as having one faculty member each; while two listed CSB as a secondary affiliation, with `:primary` these are not counted.
 
 There are several other options, for example
 ```jldoctest targets
@@ -46,8 +47,10 @@ Dict{String, Float32} with 3 entries:
   "CSB"  => 1.0
   "BBSB" => 0.5
 ```
+With `:normalized`, a faculty member with `n` affiliations contributes `1/n` to each.
+Other options include `:all` and `:weighted`.
 
-The recommended default is `:primary` because this is the only choice which yields consistent answers under program mergers.
+The recommended default is `:primary` because this is the only choice which yields consistent answers under program mergers and splits.
 
 ## Effort-based measures
 
@@ -56,7 +59,7 @@ The other main category of algorithm attempts to gauge capacity and enthusiasm f
 To compute total faculty effort, we first compute an "effort matrix" for each faculty/program pair:
 
 ```jldoctest targets
-julia> faculty, programs, E = faculty_effort(facrecs, 2016:2021);
+julia> faculty, programs, E = faculty_effort(facrecs, 2016:2020);
 
 julia> faculty
 2-element Vector{String}:
@@ -71,8 +74,8 @@ julia> programs
 
 julia> E
 2×3 Matrix{Float32}:
- 7.48624  0.0      0.182591
- 0.0      9.14132  0.0
+ 8.19102   0.0     0.199781
+ 0.0      10.8034  0.0
 ```
 
 `E[j,i]` corresponds to `faculty[j]` and `programs[i]`.
@@ -89,7 +92,7 @@ julia> f = faculty_involvement(E)
 
 This essentially means that BBSB has 0.98 faculty members (98% of "Last1, First1"'s effort, in hours, went to BBSB), EEPB has 1 (based on "Last2, First2"), and MMMP has 0.02 (based on 2% of the effort of "Last1, First1").
 
-This too has several options; `:normeffort` is the recommended default as it too is uniquely invariant under program mergers.
+This too has several options; `:normeffort` is the recommended default as the only choice that is invariant under program mergers and splits.
 
 ## Target computation
 

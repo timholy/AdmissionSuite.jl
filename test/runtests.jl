@@ -100,6 +100,10 @@ end
         @test fiis["BBSB"] ≈ 1 + 1/2 + 1
         @test fiis["BIDS"] ≈ 2
         @test fiis["HSG"] ≈ 1 + 1/2
+        # Make sure date defaults are sensible
+        daterange2020 = Date("2020-01-01"):Day(1):Date("2020-12-30") # one less due to leap year
+        _, _, E2020 = faculty_effort(facrecords, daterange2020)   # `today()` should not influence outcomes by default
+        @test E2020[:, [1,3]] ≈ E[:, [1,3]]     # BIDS wasn't around in 2020
         # Degenerate case
         fiis = Dict(zip(["A", "B"], faculty_involvement([0 0; 1 0]; scheme=:effortshare)))
         @test fiis["A"] ≈ 1
