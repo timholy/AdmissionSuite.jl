@@ -7,6 +7,7 @@ using CSV
 using Measurements
 using Statistics
 using DataStructures
+using NLsolve
 using ProgressMeter
 
 # Types

@@ -45,7 +45,7 @@ end
         tgts2 = targets(program_applicants2, fiis, 6)
         @test tgts2["AB"] ≈ 4
         @test tgts2["CTMP"] ≈ 2
-        tgts3 = targets(program_applicants2, fiis, 6, 3)
+        tgts3, _ = targets(program_applicants2, fiis, 6, 3)
         @test tgts3["AB"] ≈ 3
         @test tgts3["CTMP"] ≈ 3
         # A more realistic test that involves parsing etc
@@ -100,6 +100,10 @@ end
         @test fiis["BBSB"] ≈ 1 + 1/2 + 1
         @test fiis["BIDS"] ≈ 2
         @test fiis["HSG"] ≈ 1 + 1/2
+        # Make sure date defaults are sensible
+        daterange2020 = Date("2020-01-01"):Day(1):Date("2020-12-30") # one less due to leap year
+        _, _, E2020 = faculty_effort(facrecords, daterange2020)   # `today()` should not influence outcomes by default
+        @test E2020[:, [1,3]] ≈ E[:, [1,3]]     # BIDS wasn't around in 2020
         # Degenerate case
         fiis = Dict(zip(["A", "B"], faculty_involvement([0 0; 1 0]; scheme=:effortshare)))
         @test fiis["A"] ≈ 1
@@ -127,7 +131,7 @@ end
         @test faculty == ["fac1", "fac2", "fac3", "fac4"]
         @test programs == [newprogs...]
         @test E == [1 1 1 0; 0 1 1 1; 1 0 1 1; 1 1 0 1]
-        fiis = faculty_involvement(E)
+        fiis = faculty_involvement(E; annualthresh=0.5)
         @test fiis == [1, 1, 1, 1]
         mergepairs = ["ProgA"=>"ProgABC", "ProgB"=>"ProgABC", "ProgC"=>"ProgABC"]
         AdmissionsSimulation.addprogram("ProgABC")
@@ -138,7 +142,7 @@ end
         @test faculty_affiliations(aggrecs, :weighted) ==  Dict("ProgD"=>4/3.0f0, "ProgABC"=>8/3.0f0) # bad
         _, programsagg, Eagg = faculty_effort(aggrecs, 2020:2020)
         @test Eagg ≈ [3 0; 2 1; 2 1; 2 1]
-        fiis = Dict(zip(programsagg, faculty_involvement(Eagg)))
+        fiis = Dict(zip(programsagg, faculty_involvement(Eagg; annualthresh=0.5)))
         @test fiis["ProgD"] ≈ 1      # good
         @test fiis["ProgABC"] ≈ 3    # good
         # The next is bad
@@ -158,6 +162,24 @@ end
             AdmissionsSimulation.delprogram(prog)
         end
         AdmissionsSimulation.delprogram("ProgABC")
+
+        # Hyperbolic floors
+        napplicants = Dict("ProgA"=>100, "ProgB"=>400)
+        nfaculty = Dict("ProgA" => 25, "ProgB" => 36)
+        tgts = targets(napplicants, nfaculty, 17)
+        @test tgts["ProgA"] ≈ 5
+        @test tgts["ProgB"] ≈ 12
+        tgtsh, p = targets(napplicants, nfaculty, 17, 4.5)
+        @test tgtsh == tgts
+        @test p.n0 == 0
+        @test p.N′ == 17
+        tgtsh, p = targets(napplicants, nfaculty, 17, 6)
+        @test tgtsh["ProgA"] ≈ 6
+        @test tgtsh["ProgB"] ≈ 11
+        # Linear floors (not exported because this scheme is an even bigger tax than hyperbolic floors on big programs)
+        tgtsl = AdmissionsSimulation.targets_linear(napplicants, nfaculty, 17, 2)
+        @test tgtsl["ProgA"] ≈ 2 + 5/17*13
+        @test tgtsl["ProgB"] ≈ 2 + 12/17*13
     end
 
     @testset "Matching and matriculation probability" begin

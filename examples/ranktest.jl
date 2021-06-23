@@ -35,11 +35,12 @@ lastyear = maximum(pk -> pk.season, keys(program_history))
 rankedapplicants = filter(app->lastyear-1 <= app.season <= lastyear, applicants)
 
 ## Collect rank info
+xf2019 = XLSX.readxlsx("2018-2019-Rankings for Target formula.xlsx")
 xf2020 = XLSX.readxlsx("2019-2020-Rankings for Target formula.xlsx")
 xf2021 = XLSX.readxlsx("2020-2021-Rankings for Target formula.xlsx")
 prognames = sort(unique((app->app.program).(rankedapplicants)))
 scores = Dict{String,Tuple{Int,Int}}()
-for xf in (xf2020, xf2021)
+for xf in (xf2019, xf2020, xf2021)
     for prog in prognames
         prog ∈ XLSX.sheetnames(xf) || continue
         sheet = xf[prog][:]
@@ -54,8 +55,8 @@ for xf in (xf2020, xf2021)
         else
             sheet = sheet[1:end, 2:end]
         end
-        idxC = findfirst(isequal("CMTE Review Mean Score"), sheet[1,:])
-        idxI = findfirst(isequal("Interview Mean Score"), sheet[1,:])
+        local idxC = findfirst(isequal("CMTE Review Mean Score"), sheet[1,:])
+        local idxI = findfirst(isequal("Interview Mean Score"), sheet[1,:])
         pC = sortperm(sheet[2:end, idxC]; rev=true)
         pI = sortperm(sheet[2:end, idxI]; rev=true)
         for i = 2:size(sheet, 1)
@@ -71,7 +72,7 @@ function getapps(rankidx)
     rankedapplicants = NormalizedApplicant[]
     for row in eachrow(df)
         yr = row."Enroll Year"
-        lastyear - 1 <= yr <= lastyear || continue
+        lastyear - 2 <= yr <= lastyear || continue
         ret = parserow(row, program_history; warn=true)
         isa(ret, Bool) && continue
         progname, dadmit, ddecide, accept, ishold = ret
@@ -89,9 +90,17 @@ end
 results = Dict{String,Array{Float32,4}}()
 
 for (rankidx, rankcode) in ((1, "C"), (2, "I"))
-    rankedapplicants = getapps(rankidx)
-    corarray = match_correlation(σsels, σyields, σrs, σts;
-                                 applicants=rankedapplicants, program_history)
+    local rankedapplicants = getapps(rankidx)
+    # Leave out the latest year to save it as independent validation
+    local past_applicants = filter(app -> app.season<lastyear, rankedapplicants)
+    local corarray = match_correlation(σsels, σyields, σrs, σts;
+                                       applicants=past_applicants, program_history, minfrac=0.01)
+    # While it's OK to ignore *either* rank data or offer-time data, we don't allow this to
+    # ignore both (i.e., all individual data).
+    # While you can justify this from the thought that the purpose of these scripts is to test
+    # individual data, the reality is that without this extra step, in some cases the performance on
+    # untrained is dreadful. Generalization error remains a threat.
+    corarray[:,:,1,1] .= NaN
     results[rankcode] = corarray
 end
 
@@ -103,16 +112,29 @@ idx, rankcode, rankidx = corC > corI ? (idxC, "C", 1) : (idxI, "I", 2)
 
 rankedapplicants = getapps(rankidx)
 test_applicants = filter(app -> app.season==lastyear, rankedapplicants)
-past_applicants = filter(app -> app.season< lastyear, rankedapplicants)
+past_applicants = filter(app -> app.season<lastyear, rankedapplicants)
+
+
+progcorrelations = Dict{String,Float32}()
+for prog in pnames
+    ranks = Float32[]
+    decide = Float32[]
+    for app in rankedapplicants
+        app.program == prog || continue
+        push!(ranks, app.normrank)
+        push!(decide, app.accept)
+    end
+    progcorrelations[prog] = cor(ranks, decide)
+end
 
 offerdat = offerdata(past_applicants, program_history)
 yielddat = yielddata(Tuple{Outcome,Outcome,Outcome}, past_applicants)
 progsim = cached_similarity(σsel, σyield; offerdata=offerdat, yielddata=yielddat)
 fmatch = match_function(; σr, σt, progsim)
 # Exercise some of the offer machinery
-newoffers = Dict{Float32,Vector{Int}}()
+rollingoffers = Dict{Float32,Vector{Int}}()
 for σthresh in (1, 2, 3)
-    program_candidates = Dict{String, Vector{NormalizedApplicant}}()
+    local program_candidates = Dict{String, Vector{NormalizedApplicant}}()
     for app in test_applicants
         list = get!(Vector{NormalizedApplicant}, program_candidates, app.program)
         push!(list, app)
@@ -120,13 +142,13 @@ for σthresh in (1, 2, 3)
     for (prog, list) in program_candidates
         sort!(list; by=app->app.normrank)
     end
-    program_offers = initial_offers!(fmatch, program_candidates, past_applicants, Date("2021-01-01"), σthresh; program_history)
-    class_size_projection = Pair{Date,Measurement{Float32}}[]
-    offers = Pair{Date,Vector{String}}[]
+    local program_offers = initial_offers!(fmatch, program_candidates, past_applicants, Date("2021-01-01"), σthresh; program_history)
+    local class_size_projection = Pair{Date,Measurement{Float32}}[]
+    local offers = Pair{Date,Vector{String}}[]
     for d in Date("2021-01-02"):Day(1):Date("2021-04-14")
         lens = Dict(prog => length(list) for (prog, list) in program_offers)
         push!(class_size_projection, d=>add_offers!(fmatch, program_offers, program_candidates, past_applicants, d, σthresh; program_history))
-        newoffers = String[]
+        local newoffers = String[]
         for (prog, list) in program_offers
             for _ = 1:length(list) -lens[prog]
                 push!(newoffers, prog)
@@ -138,7 +160,7 @@ for σthresh in (1, 2, 3)
     for prog in prognames
         push!(progoffers, sum(app->app.accept, program_offers[prog]))
     end
-    newoffers[σthresh] = progoffers
+    rollingoffers[σthresh] = progoffers
 end
 tgts, actuals = Int[], Int[]
 for prog in prognames
@@ -146,7 +168,7 @@ for prog in prognames
     push!(tgts, pd.target_corrected)
     push!(actuals, pd.nmatriculants)
 end
-final_class = DataFrame("Program"=>prognames, "Target"=>tgts, "Actual"=>actuals, sort(["\$\\sigma_\\text{thresh}\$="*string(key)=>value for (key, value) in collect(newoffers)]; by=first)...)
+final_class = DataFrame("Program"=>prognames, "Target"=>tgts, "Actual"=>actuals, sort(["\$\\sigma_\\text{thresh}\$="*string(key)=>value for (key, value) in collect(rollingoffers)]; by=first)...)
 
 include("DBBSoutcomes.jl")
 

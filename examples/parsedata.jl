@@ -3,6 +3,9 @@ using AdmissionsSimulation.CSV
 using DataFrames
 using Dates
 
+# Current programs
+pnames = sort(collect(keys(filter(pr -> 2021 ∈ pr.second, AdmissionsSimulation.program_range))))
+
 progfile = "program_applicant_data.csv"
 prog = DataFrame(CSV.File(progfile))
 for i = 1:size(prog, 1)
@@ -90,5 +93,5 @@ for row in eachrow(df)
 end
 
 # Parse faculty data
-facrecs = read_faculty_data("DBBS Formula 2021.csv")
+facrecs = read_faculty_data("FacultyActivity PhD only.csv")
 facrecs = AdmissionsSimulation.aggregate(facrecs, AdmissionsSimulation.default_program_substitutions)

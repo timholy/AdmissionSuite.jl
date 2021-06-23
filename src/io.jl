@@ -89,7 +89,11 @@ function read_faculty_data(rows, full_program_names=sort(collect(keys(program_lo
     dfmt = dateformat"mm/dd/yyyy"
     return Dict(map(rows) do row
         approval = get(row, Symbol("DBBS Approval Date"), missing)
-        approval === missing && iswarn && @warn("no approval date for $(row.Faculty)")
+        if approval === missing
+            iswarn && @warn("no approval date for $(row.Faculty)")
+        else
+            approval = match(r"(\d+/\d+/\d+)", approval).captures[1] # extract just the date (omit time)
+        end
         row.Faculty => FacultyRecord(approval === missing ? today() - Day(1) : Date(approval, dfmt), affiliations(row), program_involvement(row))
     end)
 end
