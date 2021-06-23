@@ -86,7 +86,10 @@ end
 yr = 2021
 this_season = filter(pr->pr.first.season == yr, program_history)
 
+# Compute the FIIs, slots, and effective number of total faculty for actual DBBS programs
 dfweights, dfslots, dfscheme = compute_schemes(this_season, facrecs)
+# Compute the FIIs, slots, and effective number of faculty under two scenarios in which some programs
+# are merged into a "super-program." This is a test of invariance.
 mergeresults = DataFrame("Scheme" => copy(dfslots.Scheme))
 for subst in (["CSB"=>"CmteB", "DRSCB"=>"CmteB", "HSG"=>"CmteB", "MGG"=>"CmteB"],  # CommitteeB programs
               ["DRSCB"=>"B5068", "MCB"=>"B5068", "MGG"=>"B5068", "MMMP"=>"B5068"], # Require MCB course, Bio 5068

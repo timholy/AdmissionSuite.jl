@@ -1,100 +1,138 @@
 using PyPlot: PyPlot, plt
 using Colors
 using Distributions
+using MultivariateStats
+
+pnames = sort(collect(keys(filter(pr -> 2021 ∈ pr.second, AdmissionsSimulation.program_range))))  # current programs
+programcolors = hex.(distinguishable_colors(length(pnames), [colorant"white"]; dropseed=true))
 
 # Program similarity
-pnames = setdiff(sort(collect(keys(yielddat))), ["B", "CMB"])  # remove outdated programs
-psim = [[progsim_pg(p1, p2) for p1 in pnames, p2 in pnames],
-        [progsim(p1, p2) for p1 in pnames, p2 in pnames]]
-fig, axs = plt.subplots(1, 2; figsize=(6,3))
-for (i, ax) in enumerate(axs)
-    ax.imshow(psim[i])
+if isdefined(@__MODULE__, :progsim_pg)
+    psim = [[progsim_pg(p1, p2) for p1 in pnames, p2 in pnames],
+            [progsim(p1, p2) for p1 in pnames, p2 in pnames]]
+    fig, axs = plt.subplots(1, 2; figsize=(6,3))
+    for (i, ax) in enumerate(axs)
+        ax.imshow(psim[i])
+        ax.set_xticks(0:length(pnames)-1)
+        ax.set_xticklabels(pnames; rotation="vertical")
+        if i == 1
+            ax.set_yticks(0:length(pnames)-1)
+            ax.set_yticklabels(pnames)
+        else
+            ax.set_yticks(1:0)
+        end
+
+    end
+    fig.tight_layout()
+    fig.savefig("program_similarity.pdf")
+
+    # Program comparison data
+    fig, axs = plt.subplots(1, 2; figsize=(6,3))
+    ax = axs[1]
+    sel = [(od = get(offerdat, n, (0, 0)); od[1]/(od[1] + od[2])) for n in pnames]
+    ax.bar(0:length(pnames)-1, 100*sel)
     ax.set_xticks(0:length(pnames)-1)
     ax.set_xticklabels(pnames; rotation="vertical")
-    if i == 1
-        ax.set_yticks(0:length(pnames)-1)
-        ax.set_yticklabels(pnames)
-    else
-        ax.set_yticks(1:0)
+    ax.set_ylabel("% admitted")
+    ax = axs[2]
+    len(::Type{NTuple{N,T}}) where {N,T} = N
+    accepts = zeros(len(valtype(yielddat)), length(pnames))
+    declines = zero(accepts)
+    for (j, n) in enumerate(pnames)
+        local yd = get(yielddat, n, AdmissionsSimulation.null(valtype(yielddat)))
+        for (i, o) in enumerate(yd)
+            accepts[i,j] = o.naccepts
+            declines[i,j] = o.ndeclines
+        end
     end
+    xc = [1/6, 3/6, 5/6]
+    adnorm = sum(accepts; dims=1) + sum(declines; dims=1)
+    lna = plt.plot(xc, 100*accepts ./ adnorm)
+    lnd = plt.plot(xc, 100*declines ./ adnorm, "--")
+    for lns in (lna, lnd)
+        for (ln,col) in zip(lns, programcolors)
+            ln.set_color("#"*lowercase(col))
+        end
+    end
+    ax.set_xticks(xc)
+    ax.set_xticklabels(["Early", "Mid", "Late"])
+    ax.set_xlabel("Time")
+    ax.set_ylabel("% of offers")
+    ax.legend(lna, pnames; fontsize="x-small", bbox_to_anchor=(1,1))
+    fig.tight_layout()
+    fig.savefig("program_similarity_data.pdf")
+end
 
+if isdefined(@__MODULE__, :progcorrelations)
+    fig, ax = plt.subplots(1, 1; figsize=(5,3))
+    cs = [progcorrelations[prog] for prog in pnames]
+    y = length(pnames):-1:1
+    ax.barh(y, cs)
+    ax.set_yticks(y)
+    ax.set_yticklabels(pnames)
+    ax.set_xlabel("Rank/accept correlation")
+    fig.tight_layout()
+    fig.savefig("rank-accept_correlation.pdf")
 end
-fig.tight_layout()
-fig.savefig("program_similarity.pdf")
-
-# Program comparison data
-cols = hex.(distinguishable_colors(length(pnames), [colorant"white"]; dropseed=true))
-fig, axs = plt.subplots(1, 2; figsize=(6,3))
-ax = axs[1]
-sel = [(od = offerdat[n]; od[1]/(od[1] + od[2])) for n in pnames]
-ax.bar(0:length(pnames)-1, 100*sel)
-ax.set_xticks(0:length(pnames)-1)
-ax.set_xticklabels(pnames; rotation="vertical")
-ax.set_ylabel("% admitted")
-ax = axs[2]
-len(::Type{NTuple{N,T}}) where {N,T} = N
-accepts = zeros(len(valtype(yielddat)), length(pnames))
-declines = zero(accepts)
-for (j, n) in enumerate(pnames)
-    yd = yielddat[n]
-    for (i, o) in enumerate(yd)
-        accepts[i,j] = o.naccepts
-        declines[i,j] = o.ndeclines
-    end
-end
-xc = [1/6, 3/6, 5/6]
-adnorm = sum(accepts; dims=1) + sum(declines; dims=1)
-lna = plt.plot(xc, 100*accepts ./ adnorm)
-lnd = plt.plot(xc, 100*declines ./ adnorm, "--")
-for lns in (lna, lnd)
-    for (ln,col) in zip(lns, cols)
-        ln.set_color("#"*lowercase(col))
-    end
-end
-ax.set_xticks(xc)
-ax.set_xticklabels(["Early", "Mid", "Late"])
-ax.set_xlabel("Time")
-ax.set_ylabel("% of offers")
-ax.legend(lna, pnames; fontsize="x-small", bbox_to_anchor=(1,1))
-fig.tight_layout()
-fig.savefig("program_similarity_data.pdf")
 
 # Distribution of outcomes from vantage point of beginning of the season
-fig, ax = plt.subplots(1, 1; figsize=(5,3))
-ex_wl, ex_no_wl = extrema(nmatrics_wl), extrema(nmatrics_no_wl)
-nmrng = min(ex_wl[1], ex_no_wl[2]):max(ex_wl[1], ex_no_wl[2])
-h1 = ax.hist(nmatrics_wl, bins=nmrng, histtype="step")
-h2 = ax.hist(nmatrics_no_wl, bins=nmrng, histtype="step")
-ax.set_xlabel("# of matriculants")
-ax.set_ylabel("# of simulations")
-ax.legend(("all offers", "exclude waitlist"); fontsize="x-small", bbox_to_anchor=(1,1))
-ax.plot(nmrng, pdf.(Poisson(mean(nmatrics_wl)), nmrng) * length(nmatrics_wl), color=h1[3][1].get_edgecolor(), linestyle="dotted")
-ax.plot(nmrng, pdf.(Poisson(mean(nmatrics_no_wl)), nmrng) * length(nmatrics_no_wl), color=h2[3][1].get_edgecolor(), linestyle="dotted")
-fig.tight_layout()
-fig.savefig("outcome_distribution.pdf")
+if isdefined(@__MODULE__, :nmatrics_wl)
+    fig, ax = plt.subplots(1, 1; figsize=(5,3))
+    ex_wl, ex_no_wl = extrema(nmatrics_wl), extrema(nmatrics_no_wl)
+    nmrng = min(ex_wl[1], ex_no_wl[2]):max(ex_wl[1], ex_no_wl[2])
+    h1 = ax.hist(nmatrics_wl, bins=nmrng, histtype="step")
+    h2 = ax.hist(nmatrics_no_wl, bins=nmrng, histtype="step")
+    ax.set_xlabel("# of matriculants")
+    ax.set_ylabel("# of simulations")
+    ax.legend(("all offers", "exclude waitlist"); fontsize="x-small", bbox_to_anchor=(1,1))
+    ax.plot(nmrng, pdf.(Poisson(mean(nmatrics_wl)), nmrng) * length(nmatrics_wl), color=h1[3][1].get_edgecolor(), linestyle="dotted")
+    ax.plot(nmrng, pdf.(Poisson(mean(nmatrics_no_wl)), nmrng) * length(nmatrics_no_wl), color=h2[3][1].get_edgecolor(), linestyle="dotted")
+    fig.tight_layout()
+    fig.savefig("outcome_distribution.pdf")
 
-# Waitlist dynamics
-fig, axs = plt.subplots(1, 3; figsize=(7,3))
-ax = axs[1]
-ex = extrema(dbbsnmatric)
-wlrng = ex[begin]:ex[end]
-h1 = ax.hist(dbbsnmatric; bins=wlrng, histtype="step")
-ax.plot(wlrng, pdf.(Poisson(mean(dbbsnmatric)), wlrng) * length(dbbsnmatric), color=h1[3][1].get_edgecolor(), linestyle="dotted")
-ax.set_xlabel("# of matriculants")
-ax.set_ylabel("# of simulations")
-ax = axs[2]
-nex = sort(collect(nexhaust))
-ax.bar(0:length(nex)-1, 100*last.(nex)/length(dbbsnmatric))
-ax.set_xticks(0:length(nex)-1)
-ax.set_xticklabels(first.(nex); rotation="vertical")
-ax.set_ylabel("% of waitlist exhaustion")
-ax = axs[3]
-ax.bar(0:length(dates)-1, noffers / length(dbbsnmatric))
-ax.set_xticks(0:length(dates)-1)
-ax.set_xticklabels(dates; rotation="vertical")
-ax.set_ylabel("Mean # offers extended")
-fig.tight_layout()
-fig.savefig("outcome_waitlist_distribution_$rankstate.pdf")
+    # Waitlist dynamics
+    fig, axs = plt.subplots(1, 3; figsize=(7,3))
+    ax = axs[1]
+    ex = extrema(dbbsnmatric)
+    wlrng = ex[begin]:ex[end]
+    h1 = ax.hist(dbbsnmatric; bins=wlrng, histtype="step")
+    ax.plot(wlrng, pdf.(Poisson(mean(dbbsnmatric)), wlrng) * length(dbbsnmatric), color=h1[3][1].get_edgecolor(), linestyle="dotted")
+    ax.set_xlabel("# of matriculants")
+    ax.set_ylabel("# of simulations")
+    ax = axs[2]
+    nex = sort(collect(nexhaust))
+    ax.bar(0:length(nex)-1, 100*last.(nex)/length(dbbsnmatric))
+    ax.set_xticks(0:length(nex)-1)
+    ax.set_xticklabels(first.(nex); rotation="vertical")
+    ax.set_ylabel("% of waitlist exhaustion")
+    ax = axs[3]
+    ax.bar(0:length(dates)-1, noffers / length(dbbsnmatric))
+    ax.set_xticks(0:length(dates)-1)
+    ax.set_xticklabels(dates; rotation="vertical")
+    ax.set_ylabel("Mean # offers extended")
+    fig.tight_layout()
+    fig.savefig("outcome_waitlist_distribution_$rankstate.pdf")
+end
+
+if isdefined(@__MODULE__, :class_size_projection)
+    fig, ax = plt.subplots(1, 1)
+    d = first.(class_size_projection)
+    sz = last.(class_size_projection)
+    msz, σsz = (x->x.val).(sz), (x->x.err).(sz)
+    ax.errorbar(d, msz, yerr=σsz)
+    ax.set_xlabel("Date")
+    for lbl in ax.get_xticklabels()
+        lbl.set_rotation(90)
+    end
+    ax.set_ylabel("Projected class size")
+    for (i, (d, list)) in enumerate(offers)
+        if !isempty(list)
+            ax.annotate(string(length(list)), (d, msz[i]+σsz[i]+2), color="red")
+        end
+    end
+    fig.tight_layout()
+    fig.savefig("rolling_waitlist.pdf")
+end
 
 # Faculty service (aggregate by program)
 totsvc = sort(collect(AdmissionsSimulation.program_service(facrecs)); by=first)
@@ -111,16 +149,26 @@ ax.set_ylabel("# thesis committees")
 fig.tight_layout()
 fig.savefig("faculty_service.pdf")
 
-if isdefined(@__MODULE__, :class_size_projection)
+# Comparison of schemes
+if isdefined(@__MODULE__, :dfweights)
+    schemedata = Matrix(dfweights[:,begin+1:end])'
+    projinfo = fit(PCA, schemedata)
+    proj = MultivariateStats.transform(projinfo, schemedata)
+
+    colorscheme = Dict("AffilPrimary"=>RGB(0.2,1,0), "AffilAll"=>RGB(1, 0, 0.8), "AffilNorm"=>RGB(0, 0.5, 0),
+                       "AffilWeight"=>RGB(0, 0.6, 0), "ThreshEffort"=>RGB(0.8, 0, 1), "NormEffort"=>RGB(0,1,0),
+                       "EffortShare"=>RGB(0,0.7,0.5))
     fig, ax = plt.subplots(1, 1)
-    d = first.(class_size_projection)
-    sz = last.(class_size_projection)
-    msz, σsz = (x->x.val).(sz), (x->x.err).(sz)
-    ax.errorbar(d, msz, yerr=σsz)
-    ax.set_xlabel("Date")
-    for lbl in ax.get_xticklabels()
-        lbl.set_rotation(90)
+    pts = ax.scatter(proj[1,:], proj[2,:], c = ("#",) .* lowercase.(hex.([colorscheme[scheme] for scheme in dfweights.Scheme])))
+    for i in axes(proj, 2)
+        ax.text(proj[1:2,i]..., dfweights.Scheme[i])
     end
+    ax.set_aspect("equal")
+    ax.set_xlabel("PC1")
+    ax.set_ylabel("PC2")
+    fig.tight_layout()
+    fig.savefig("scheme_PCA.pdf")
+end
 
 # Impact of floors on targets
 if isdefined(@__MODULE__, :Δl)

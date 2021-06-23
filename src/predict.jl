@@ -201,7 +201,7 @@ function collect_predictions!(pmatrics::AbstractVector, accepts::AbstractVector{
                               σsel::Real, σyield::Real, σr::Real, σt::Real;
                               applicants, past_applicants, offerdata, yielddata,
                               ptail=0.0f0,
-                              #= fraction of prior applicants that must match =# minfrac=0.0)
+                              #= fraction of prior applicants that must match =# minfrac=0.01)
     progsim = cached_similarity(σsel, σyield; offerdata, yielddata)
     fmatch = match_function(; σr, σt, progsim)
     nviolations = 0

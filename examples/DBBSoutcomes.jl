@@ -111,7 +111,7 @@ actual_yield = Dict(map(filter(pr -> pr.first.season == lastyear, collect(progra
     pk.program => pd.nmatriculants
 end)
 for tnow in (Date("$lastyear-03-15"), Date("$lastyear-04-01"))
-    local nmatric, progdata, pnames, ntarget
+    local nmatric, progdata, pnames, ntarget, progstatus
     nmatric, progstatus = wait_list_analysis(fmatch, past_applicants, test_applicants, tnow; program_history, actual_yield)
     foffers = future_offers(test_applicants, tnow; program_history)
     pnames = sort(collect(keys(progstatus)))
@@ -182,6 +182,7 @@ nexhaust = Dict(k => 0 for (k, _) in progapps)
     for i in eachindex(dates)
         date = dates[i]
         while true
+            local progstatus
             nmatrics, progstatus = wait_list_analysis(fmatch, past_applicants, simapplicants, date; program_history)
             nmatrics.val + nmatrics.err < ntarget || break
             # Make another offer
