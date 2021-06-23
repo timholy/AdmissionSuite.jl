@@ -131,7 +131,7 @@ end
         @test faculty == ["fac1", "fac2", "fac3", "fac4"]
         @test programs == [newprogs...]
         @test E == [1 1 1 0; 0 1 1 1; 1 0 1 1; 1 1 0 1]
-        fiis = faculty_involvement(E)
+        fiis = faculty_involvement(E; annualthresh=0.5)
         @test fiis == [1, 1, 1, 1]
         mergepairs = ["ProgA"=>"ProgABC", "ProgB"=>"ProgABC", "ProgC"=>"ProgABC"]
         AdmissionsSimulation.addprogram("ProgABC")
@@ -142,7 +142,7 @@ end
         @test faculty_affiliations(aggrecs, :weighted) ==  Dict("ProgD"=>4/3.0f0, "ProgABC"=>8/3.0f0) # bad
         _, programsagg, Eagg = faculty_effort(aggrecs, 2020:2020)
         @test Eagg ≈ [3 0; 2 1; 2 1; 2 1]
-        fiis = Dict(zip(programsagg, faculty_involvement(Eagg)))
+        fiis = Dict(zip(programsagg, faculty_involvement(Eagg; annualthresh=0.5)))
         @test fiis["ProgD"] ≈ 1      # good
         @test fiis["ProgABC"] ≈ 3    # good
         # The next is bad

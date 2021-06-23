@@ -154,7 +154,7 @@ lastday(d::Date) = d
 lastday(yr::Integer) = min(today(), Date(yr, 12, 31))
 
 """
-    f = faculty_involvement(E::AbstractMatrix; scheme=:normeffort, annualthresh=2, M=size(E,1))
+    f = faculty_involvement(E::AbstractMatrix; scheme=:normeffort, annualthresh=3, M=size(E,1))
 
 Compute the effective number of faculty `f[i]` involved in program `i`, based on annual effort `E` as computed
 by [`faculty_effort`](@ref). `annualthresh` is the number of hours that must be exceeded in order to qualify
@@ -168,7 +168,7 @@ There are three schemes available:
 - `:effortshare`: calculate the average service per faculty member (`M` faculty members total) for each program.
   If a faculty member exceeded this threshold for `k` programs, add `1/k` to each. `annualthresh` plays no role here.
 """
-function faculty_involvement(E::AbstractMatrix; scheme=:normeffort, annualthresh=2, M=size(E,1))
+function faculty_involvement(E::AbstractMatrix; scheme=:normeffort, annualthresh=3, M=size(E,1))
     scheme === :thresheffort && return vec(sum(E .> annualthresh; dims=1))
     if scheme === :normeffort
         Esum2 = sum(E; dims=2)     # total effort by faculty member
