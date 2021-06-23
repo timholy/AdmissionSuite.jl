@@ -3,6 +3,20 @@ using DataFrames
 
 # Load the data with "parsedata.jl" before running this
 
+# Create the table of # of applicants
+yrs = 2017:2021
+nappm = Vector{Union{Missing,Int}}(undef, length(yrs))
+fill!(nappm, missing)
+dfnapplicants = DataFrame("Year"=>yrs, (name=>copy(nappm) for name in pnames)...)
+for (pk, pd) in program_history
+    i = findfirst(isequal(pk.season), yrs)
+    i === nothing && continue
+    j = findfirst(isequal(pk.program), names(dfnapplicants))
+    j === nothing && continue
+    dfnapplicants[i,j] = pd.napplicants
+end
+
+#
 function compute_schemes(program_data, facrecs)
     N = sum(pr->pr.second.target_corrected, program_data)  # total number of target slots across all programs
     program_napplicants = Dict(pk.program => pd.napplicants for (pk, pd) in program_data)
@@ -99,14 +113,39 @@ for subst in (["CSB"=>"CmteB", "DRSCB"=>"CmteB", "HSG"=>"CmteB", "MGG"=>"CmteB"]
     end
 end
 
-yrs = 2017:2021
-nappm = Vector{Union{Missing,Int}}(undef, length(yrs))
-fill!(nappm, missing)
-dfnapplicants = DataFrame("Year"=>yrs, (name=>copy(nappm) for name in names(dfslots) if name != "Scheme")...)
-for (pk, pd) in program_history
-    i = findfirst(isequal(pk.season), yrs)
-    i === nothing && continue
-    j = findfirst(isequal(pk.program), names(dfnapplicants))
-    j === nothing && continue
-    dfnapplicants[i,j] = pd.napplicants
+
+sc = calibrate_service(facrecs)
+_, pnamesE, E = faculty_effort(facrecs, 2016:2021; sc)   # FIXME
+
+# When using `:thresheffort`, compute the mean number of votes per faculty per program, as a function of the threshold
+function votes_per_program(E, thresh)
+    B = E .> thresh
+    vperf = sum(B; dims=2)
+    return vec(sum(B .* vperf; dims=1)./sum(B; dims=1))
+end
+dfvotes = DataFrame("Threshold" => Float32[], [prog => Float32[] for prog in pnames]...)
+for thresh in exp.(range(log(0.1), stop=log(50), length=101))
+    push!(dfvotes, [thresh; votes_per_program(E, thresh)])
+end
+
+# Analyze the impact of floors when using `:normeffort`
+program_nfaculty = Dict(name => fᵢ for (name, fᵢ) in zip(pnamesE, faculty_involvement(E; scheme=:normeffort)))
+program_napplicants = Dict(pk.program => pd.napplicants for (pk, pd) in this_season)
+N = sum(pr->pr.second.target_corrected, this_season)
+tgtsraw = targets(program_napplicants, program_nfaculty, N)
+tgtsh, tgtparams = targets(program_napplicants, program_nfaculty, N, 4)                   # hyperbolic floor
+tgtsl = AdmissionsSimulation.targets_linear(program_napplicants, program_nfaculty, N, 3)  # linear floor (what we did in 2021)
+progs_by_size = sort(collect(tgtsraw); by=last)
+Δl = [tgtsl[prog] - tgtsraw[prog] for prog in first.(progs_by_size)]
+Δh = [tgtsh[prog] - tgtsraw[prog] for prog in first.(progs_by_size)]
+
+# When using `:thresheffort`, compute the mean number of votes per faculty per program, as a function of the threshold
+function votes_per_program(E, thresh)
+    B = E .> thresh
+    vperf = sum(B; dims=2)
+    return vec(sum(B .* vperf; dims=1)./sum(B; dims=1))
+end
+dfvotes = DataFrame("Threshold" => Float32[], [prog => Float32[] for prog in pnames]...)
+for thresh in exp.(range(log(0.1), stop=log(50), length=101))
+    push!(dfvotes, [thresh; votes_per_program(E, thresh)])
 end

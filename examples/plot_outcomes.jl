@@ -121,12 +121,52 @@ if isdefined(@__MODULE__, :class_size_projection)
     for lbl in ax.get_xticklabels()
         lbl.set_rotation(90)
     end
-    ax.set_ylabel("Projected class size")
-    for (i, (d, list)) in enumerate(offers)
-        if !isempty(list)
-            ax.annotate(string(length(list)), (d, msz[i]+σsz[i]+2), color="red")
-        end
-    end
+
+# Impact of floors on targets
+if isdefined(@__MODULE__, :Δl)
+    fig, ax = plt.subplots(1, 1)
+    y = 1:length(progs_by_size)
+    ax.barh(y, Δl)
+    ax.set_yticks(y)
+    ax.set_yticklabels(first.(progs_by_size))
+    ax.set_xlabel("# slots granted")
     fig.tight_layout()
-    fig.savefig("rolling_waitlist.pdf")
+    fig.savefig("linear_floors.pdf")
+
+    fig, ax = plt.subplots(1, 1)
+    y = 1:length(progs_by_size)
+    ax.barh(y .+ 1/6, Δl, 1/3)
+    ax.barh(y .- 1/6, Δh, 1/3)
+    ax.set_yticks(y)
+    ax.set_yticklabels(first.(progs_by_size))
+    ax.set_xlabel("# slots granted")
+    ax.legend(("linear", "hyperbolic"))
+    fig.tight_layout()
+    fig.savefig("linear_hyperbolic_floors.pdf")
+
+    fig, ax = plt.subplots(1, 1)
+    x = 0.0:0.1:maximum(last, tgtsraw)
+    ax.plot(x, 3 .+ (101-39)/101 * x)
+    ax.plot(x, sqrt.(16 .+ (tgtparams.N′/101)^2 * x.^2))
+    ax.plot(x, x)
+    ax.legend(("linear", "hyperbolic", "raw"))
+    ax.set_xlabel("Slots (raw)")
+    ax.set_ylabel("Slots with floor")
+    fig.tight_layout()
+    fig.savefig("floor_schemes.pdf")
+end
+
+# Votes per faculty
+if isdefined(@__MODULE__, :dfvotes)
+    fig, ax = plt.subplots(1, 1)
+    x = dfvotes.Threshold
+    for (pname, color) in zip(pnames, programcolors)
+        ax.semilogx(x, dfvotes[!, pname], color="#"*lowercase(color))
+    end
+    ax.legend(pnames; fontsize="x-small")
+    ax.set_xlabel("Threshold (hrs/year)")
+    ax.set_ylabel("Mean # votes/qualifying faculty")
+    ax.set_ylim(0, 5)
+    fig.tight_layout()
+    fig.savefig("votes_per_program.pdf")
 end
