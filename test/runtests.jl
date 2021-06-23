@@ -45,7 +45,7 @@ end
         tgts2 = targets(program_applicants2, fiis, 6)
         @test tgts2["AB"] ≈ 4
         @test tgts2["CTMP"] ≈ 2
-        tgts3 = targets(program_applicants2, fiis, 6, 3)
+        tgts3, _ = targets(program_applicants2, fiis, 6, 3)
         @test tgts3["AB"] ≈ 3
         @test tgts3["CTMP"] ≈ 3
         # A more realistic test that involves parsing etc
@@ -158,6 +158,24 @@ end
             AdmissionsSimulation.delprogram(prog)
         end
         AdmissionsSimulation.delprogram("ProgABC")
+
+        # Hyperbolic floors
+        napplicants = Dict("ProgA"=>100, "ProgB"=>400)
+        nfaculty = Dict("ProgA" => 25, "ProgB" => 36)
+        tgts = targets(napplicants, nfaculty, 17)
+        @test tgts["ProgA"] ≈ 5
+        @test tgts["ProgB"] ≈ 12
+        tgtsh, p = targets(napplicants, nfaculty, 17, 4.5)
+        @test tgtsh == tgts
+        @test p.n0 == 0
+        @test p.N′ == 17
+        tgtsh, p = targets(napplicants, nfaculty, 17, 6)
+        @test tgtsh["ProgA"] ≈ 6
+        @test tgtsh["ProgB"] ≈ 11
+        # Linear floors (not exported because this scheme is an even bigger tax than hyperbolic floors on big programs)
+        tgtsl = AdmissionsSimulation.targets_linear(napplicants, nfaculty, 17, 2)
+        @test tgtsl["ProgA"] ≈ 2 + 5/17*13
+        @test tgtsl["ProgB"] ≈ 2 + 12/17*13
     end
 
     @testset "Matching and matriculation probability" begin

@@ -183,36 +183,89 @@ function faculty_involvement(E::AbstractMatrix; scheme=:normeffort, annualthresh
 end
 
 """
-    targets(program_applicants, fiis, N)
+    tgts = targets(program_napplicants, program_nfaculty, N)
 
-Compute the target number of matriculants for each program. `program_applicants` is a collection of `program => napplicants`
-pairs; `fiis` is a collection of `program => FII` scores (see [`faculty_involvement`](@ref)).
+Compute the target number of matriculants for each program. `program_napplicants` is a collection of `program => napplicants`
+pairs; `program_nfaculty` is a collection of `program => nfaculty` scores (see [`faculty_affiliations`](@ref) and [`faculty_involvement`](@ref)).
 `N` is the total number of matriculants across all programs.
 
-Each program gets weighted by the geometric mean of the # of applicants and FII.
+Each program gets weighted by the geometric mean of the # of applicants and faculty. In other words, each program gets
+
+```math
+n_i = N \\frac{\\sqrt{a_i f_i}}{\\sum_k \\sqrt{a_k f_k}}
+```
+
+slots.  On output, `tgts[program]` is the number of slots for `program`.
 """
-function targets(program_applicants, fiis, N)
+function targets(program_napplicants, program_nfaculty, N)
     weights = Float32[]
-    for (program, napplicants) in program_applicants
-        push!(weights, sqrt(napplicants * get(fiis, program, zero(valtype(fiis)))))
+    for (program, napplicants) in program_napplicants
+        push!(weights, sqrt(napplicants * get(program_nfaculty, program, zero(valtype(program_nfaculty)))))
     end
     W = sum(weights)
     tgts = Dict{String,Float32}()
-    for ((program, napplicants), w) in zip(program_applicants, weights)
+    for ((program, _), w) in zip(program_napplicants, weights)
         tgts[program] = N*w/W
     end
     return tgts
 end
 
-function targets(program_applicants, fiis, N, per_program_gift)
+"""
+    tgts, parameters = targets(program_napplicants, program_nfaculty, N, minslots)
+
+Compute the target number of matriculants for each program, reserving some slots to ensure that no program gets
+fewer than `minslots`. Slots are assigned via a "hyperbolic" parametrization:
+if `nᵢ` is the number of slots that would be computed by `targets` without `minslots`, then this produces
+
+```math
+n_i' = \\sqrt{n_0^2 + \\frac{N'^2}{N^2}n_i^2}.
+```
+
+`n₀` and `N′` are `parameters` computed to ensure that the minimum `nᵢ′` (across all programs) is equal to `minslots`,
+and the sum of slots is `N`.
+Very small programs might receive most of their slots from `n₀`,
+whereas large programs lose a fraction `N′/N` of `nᵢ`.
+"""
+function targets(program_napplicants, program_nfaculty, N, minslots)
+    weights² = Float32[]
+    progs = String[]
+    for (program, napplicants) in program_napplicants
+        push!(weights², napplicants * program_nfaculty[program])
+        push!(progs, program)
+    end
+    W = sum(sqrt, weights²)
+
+    slots(n0, N′) = sqrt.(n0^2 .+ (N′^2/W^2) .* weights²)
+    function constraints!(F, x)
+        n0, N′ = x[1], x[2]
+        s = slots(n0, N′)
+        F[1] = minimum(s) - minslots    # enforces minimum(s) == minslots
+        F[2] = sum(s) - N               # enforces sum(s) == N
+        return F
+    end
+
+    n0, N′ = 0.0, Float64(N)
+    ns = slots(n0, N′)
+    if minimum(ns) < minslots
+        ret = nlsolve(constraints!, Float64[minslots, N])
+        converged(ret) || @error("targets failed to converge")
+        n0, N′ = ret.zero[1], ret.zero[2]
+        ns = slots(n0, N′)
+    end
+    return Dict(program => sᵢ for (program, sᵢ) in zip(progs, ns)), (n0=n0, N′=N′)
+end
+
+# Linear offset variant of the `minslots` version of `targets`.
+# Not recommended, as it exacts a much higher tax on larger programs.
+function targets_linear(program_napplicants, program_nfaculty, N, per_program_gift)
     weights = Float32[]
-    for (program, napplicants) in program_applicants
-        push!(weights, sqrt(napplicants * fiis[program]))
+    for (program, napplicants) in program_napplicants
+        push!(weights, sqrt(napplicants * program_nfaculty[program]))
     end
     W = sum(weights)
     tgts = Dict{String,Float32}()
-    Nsave = length(program_applicants) * per_program_gift
-    for ((program, napplicants), w) in zip(program_applicants, weights)
+    Nsave = length(program_napplicants) * per_program_gift
+    for (program, w) in zip(keys(program_napplicants), weights)
         tgts[program] = per_program_gift + (N-Nsave)*w/W
     end
     return tgts
