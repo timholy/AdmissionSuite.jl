@@ -114,22 +114,33 @@ if isdefined(@__MODULE__, :nmatrics_wl)
     fig.savefig("outcome_waitlist_distribution_$rankstate.pdf")
 end
 
-if isdefined(@__MODULE__, :class_size_projection)
-    fig, ax = plt.subplots(1, 1)
+if isdefined(@__MODULE__, :rollingprojections)
+    σthresh = 2
+    class_size_projection = rollingprojections[σthresh]
     d = first.(class_size_projection)
     sz = last.(class_size_projection)
     msz, σsz = (x->x.val).(sz), (x->x.err).(sz)
-    ax.errorbar(d, msz, yerr=σsz)
+    fig, ax = plt.subplots(1, 1)
+    # ax.errorbar(d, msz, yerr=σsz)
+    ln = ax.plot(d, msz)
+    hexcolor = only(ln).get_color()
+    ax.fill_between(d, msz - σsz, msz + σsz, color=hexcolor*"60")
     ax.set_xlabel("Date")
     for lbl in ax.get_xticklabels()
         lbl.set_rotation(90)
     end
     ax.set_ylabel("Projected class size")
-    for (i, (d, list)) in enumerate(offers)
+    for (i, (d, list)) in enumerate(rollingoffers[σthresh])
         if !isempty(list)
             ax.annotate(string(length(list)), (d, msz[i]+σsz[i]+2), color="red")
         end
     end
+    N = sum(tgts)
+    yl = ax.get_ylim()
+    if N > yl[2]
+        ax.set_ylim((yl[1], N+2))
+    end
+    ax.plot(d[[begin,end]], [N,N], "k--")
     fig.tight_layout()
     fig.savefig("rolling_waitlist.pdf")
 end

@@ -219,7 +219,7 @@ end
 """
     match_correlation(σsel::Real, σyield::Real, σr::Real, σt::Real;
                       applicants, past_applicants, offerdata, yielddata,
-                      ptail=0.0f0, minfrac=0.0)
+                      ptail=0.0f0, minfrac=0.01)
 
 Compute the correlation between estimated matriculation probability and decline/accept
 for a list of `applicants`' matriculation decisions.

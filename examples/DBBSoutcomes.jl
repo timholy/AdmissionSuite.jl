@@ -52,7 +52,7 @@ round1(x) = round(x; digits=1)
 nmatric = tmatric = 0
 smatric = 0.0f0 ± 0.0f0
 tnow = 0.0f0
-startdf = DataFrame("Program" => String[], "Average # matched/app" => Float32[], "Target" => Int[], "Predicted" => Measurement{Float32}[], "Actual" => Int[])
+startdf = DataFrame("Program" => String[], "Average \\# matched/app" => Float32[], "Target" => Int[], "Predicted" => Measurement{Float32}[], "Actual" => Int[])
 for progname in sort(collect(AdmissionsSimulation.program_abbrvs))
     global smatric, nmatric, tmatric
     papps = filter(app->app.program == progname, test_applicants)
