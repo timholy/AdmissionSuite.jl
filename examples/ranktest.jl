@@ -8,9 +8,8 @@ using InvertedIndices
 using DataFrames
 
 # Load data with "parsedata.jl" before running this
-# Also get the σ vectors from DBBStrain
 
-substnan(A) = [isnan(a) ? oftype(a, -Inf) : a for a in A]
+include("train.jl")
 
 # # Since we only have a single year of data, use a LOO strategy to predict outcome
 # function AdmissionsSimulation.match_correlation(σr::Real, σt::Real;
@@ -111,6 +110,12 @@ idx, rankcode, rankidx = corC > corI ? (idxC, "C", 1) : (idxI, "I", 2)
 σsel, σyield, σr, σt = σsels[idx[1]], σyields[idx[2]], σrs[idx[3]], σts[idx[4]]
 
 rankedapplicants = getapps(rankidx)
+
+# Also get program-only parameters for this data set
+corarray_pg = match_correlation(σsels, σyields, [Inf32], [Inf32]; applicants=rankedapplicants, program_history)
+idx_pg = argmax(substnan(corarray_pg))
+σsel_pg, σyield_pg, σr_pg, σt_pg = σsels[idx_pg[1]], σyields[idx_pg[2]], Inf32, Inf32
+
 test_applicants = filter(app -> app.season==lastyear, rankedapplicants)
 past_applicants = filter(app -> app.season<lastyear, rankedapplicants)
 
@@ -132,7 +137,9 @@ yielddat = yielddata(Tuple{Outcome,Outcome,Outcome}, past_applicants)
 progsim = cached_similarity(σsel, σyield; offerdata=offerdat, yielddata=yielddat)
 fmatch = match_function(; σr, σt, progsim)
 # Exercise some of the offer machinery
-rollingoffers = Dict{Float32,Vector{Int}}()
+rollingnaccepts = Dict{Float32,Vector{Int}}()
+rollingprojections = Dict{Float32,Vector{Pair{Date,Measurement{Float32}}}}()
+rollingoffers = Dict{Float32,Vector{Pair{Date,Vector{String}}}}()
 for σthresh in (1, 2, 3)
     local program_candidates = Dict{String, Vector{NormalizedApplicant}}()
     for app in test_applicants
@@ -156,11 +163,13 @@ for σthresh in (1, 2, 3)
         end
         push!(offers, d=>newoffers)
     end
-    progoffers = Int[]
+    prognaccepts = Int[]
     for prog in prognames
-        push!(progoffers, sum(app->app.accept, program_offers[prog]))
+        push!(prognaccepts, sum(app->app.accept, program_offers[prog]))
     end
-    rollingoffers[σthresh] = progoffers
+    rollingoffers[σthresh] = offers
+    rollingnaccepts[σthresh] = prognaccepts
+    rollingprojections[σthresh] = class_size_projection
 end
 tgts, actuals = Int[], Int[]
 for prog in prognames
@@ -168,7 +177,7 @@ for prog in prognames
     push!(tgts, pd.target_corrected)
     push!(actuals, pd.nmatriculants)
 end
-final_class = DataFrame("Program"=>prognames, "Target"=>tgts, "Actual"=>actuals, sort(["\$\\sigma_\\text{thresh}\$="*string(key)=>value for (key, value) in collect(rollingoffers)]; by=first)...)
+final_class = DataFrame("Program"=>prognames, "Target"=>tgts, "Actual"=>actuals, sort(["\$\\sigma_\\text{thresh}\$="*string(key)=>value for (key, value) in collect(rollingnaccepts)]; by=first)...)
 
 include("DBBSoutcomes.jl")
 
