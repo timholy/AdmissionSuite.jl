@@ -2,6 +2,7 @@
 AdmissionsSimulation = "e9cde6de-6074-429b-acec-d279973730fc"
 DataFrames = "a93c6f00-e57d-5684-b7b6-d8193f3e46c0"
 Dates = "ade2ca70-3891-5945-98fb-dc099432e06a"
+GLM = "38e38edf-8417-5370-95a0-9cbb8c7f171a"
 InvertedIndices = "41ab1584-1d38-5bbf-9106-f11c6c58b48f"
 LatexPrint = "d2208f48-c256-5759-9089-c25ed2a93924"
 MultivariateStats = "6f286f6a-111f-5878-ab1e-185364afe411"
