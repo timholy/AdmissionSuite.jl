@@ -37,3 +37,9 @@ if isdefined(Main, :final_class)
         tabular(io, final_class)
     end
 end
+
+if isdefined(Main, :dftweaks)
+    open("tweaked_slots.tex", "w") do io
+        tabular(io, dftweaks)
+    end
+end

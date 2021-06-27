@@ -143,9 +143,11 @@ function faculty_effort(facrecs::ListPairs{String,FacultyRecord},
     for (key, facrec) in facrecs
         j = faclkup[key]
         daysfac = intersect(facrec.start:Day(1):finaldate, dayrange)
+        isempty(daysfac) && !isempty(facrec.service) && @warn("$key has service but date range is empty (setting to 1 year)")
         for (prog, fi) in facrec.service
             thisprogdays = intersect(daysfac, progdays[prog])
-            E[j, proglkup[prog]] += (sc === nothing ? total(fi) : total(fi, sc)) / (length(thisprogdays)/365)
+            nyrs = isempty(daysfac) ? 1.0 : length(thisprogdays)/365
+            E[j, proglkup[prog]] += (sc === nothing ? total(fi) : total(fi, sc)) / nyrs
         end
     end
     return ufacs, uprogs, E
