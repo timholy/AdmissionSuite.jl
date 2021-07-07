@@ -204,7 +204,7 @@ slots.  On output, `tgts[program]` is the number of slots for `program`.
 function targets(program_napplicants, program_nfaculty, N)
     weights = Float32[]
     for (program, napplicants) in program_napplicants
-        push!(weights, sqrt(napplicants * get(program_nfaculty, program, zero(valtype(program_nfaculty)))))
+        push!(weights, rawweight(napplicants, program_nfaculty, program))
     end
     W = sum(weights)
     tgts = Dict{String,Float32}()
@@ -230,11 +230,11 @@ and the sum of slots is `N`.
 Very small programs might receive most of their slots from `n₀`,
 whereas large programs lose a fraction `N′/N` of `nᵢ`.
 """
-function targets(program_napplicants, program_nfaculty, N, minslots)
-    weights² = Float32[]
+function targets(program_napplicants, program_nfaculty, N, minslots; iswarn::Bool=true)
+    weights² = Float32[]   # with the hyperbolic we store the raw weight squared
     progs = String[]
     for (program, napplicants) in program_napplicants
-        push!(weights², napplicants * program_nfaculty[program])
+        push!(weights², rawweight(napplicants, program_nfaculty, program)^2)
         push!(progs, program)
     end
     W = sum(sqrt, weights²)
@@ -256,6 +256,11 @@ function targets(program_napplicants, program_nfaculty, N, minslots)
         n0, N′ = ret.zero[1], ret.zero[2]
         ns = slots(n0, N′)
     end
+    nearned² = (N′^2/W^2) .* weights²
+    failing = nearned² .< 1
+    if any(failing) && iswarn
+        @warn("The following programs 'earned' less than one slot (give them notice): $(progs[failing])")
+    end
     return Dict(program => sᵢ for (program, sᵢ) in zip(progs, ns)), (n0=n0, N′=N′)
 end
 
@@ -274,3 +279,6 @@ function targets_linear(program_napplicants, program_nfaculty, N, per_program_gi
     end
     return tgts
 end
+
+rawweight(napplicants, program_nfaculty, program) = sqrt(napplicants * get(program_nfaculty, program, zero(valtype(program_nfaculty))))
+rawweight(napplicants, ::Nothing, program) = napplicants

@@ -45,7 +45,7 @@ end
         tgts2 = targets(program_applicants2, fiis, 6)
         @test tgts2["AB"] ≈ 4
         @test tgts2["CTMP"] ≈ 2
-        tgts3, _ = targets(program_applicants2, fiis, 6, 3)
+        tgts3, _ = targets(program_applicants2, fiis, 6, 3; iswarn=false)
         @test tgts3["AB"] ≈ 3
         @test tgts3["CTMP"] ≈ 3
         # A more realistic test that involves parsing etc
@@ -180,6 +180,16 @@ end
         tgtsl = AdmissionsSimulation.targets_linear(napplicants, nfaculty, 17, 2)
         @test tgtsl["ProgA"] ≈ 2 + 5/17*13
         @test tgtsl["ProgB"] ≈ 2 + 12/17*13
+
+        # Targets from applicants-only
+        napplicants = Dict("ProgA"=>100, "ProgB"=>400)
+        tgts = targets(napplicants, nothing, 10)
+        @test tgts["ProgA"] ≈ 2
+        @test tgts["ProgB"] ≈ 8
+        tgts, p = targets(napplicants, nothing, 10, 4)
+        @test tgts["ProgA"] ≈ 4
+        @test tgts["ProgB"] ≈ 6
+        @test_logs (:warn, "The following programs 'earned' less than one slot (give them notice): [\"ProgA\"]") targets(Dict("ProgA"=>1, "ProgB"=>11), nothing, 11, 2)
     end
 
     @testset "Matching and matriculation probability" begin
