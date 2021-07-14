@@ -12,6 +12,10 @@ XLSX = "fdbf4ff8-1666-58a4-91e7-1b58723a45e0"
 
 [compat]
 DataFrames = "1"
+GLM = "1"
+InvertedIndices = "1"
 LatexPrint = "1"
+MultivariateStats = "0.8"
 PyPlot = "2"
+XLSX = "0.7"
 julia = "1"

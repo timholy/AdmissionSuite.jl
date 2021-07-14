@@ -42,4 +42,7 @@ if isdefined(Main, :dftweaks)
     open("tweaked_slots.tex", "w") do io
         tabular(io, dftweaks)
     end
+    open("gradual_slots.tex", "w") do io
+        tabular(io, dfgradual)
+    end
 end
