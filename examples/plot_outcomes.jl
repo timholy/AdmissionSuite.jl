@@ -2,6 +2,7 @@ using PyPlot: PyPlot, plt
 using Colors
 using Distributions
 using MultivariateStats
+using GLM
 
 pnames = sort(collect(keys(filter(pr -> 2021 ∈ pr.second, AdmissionsSimulation.program_range))))  # current programs
 programcolors = hex.(distinguishable_colors(length(pnames), [colorant"white"]; dropseed=true))
@@ -73,6 +74,48 @@ if isdefined(@__MODULE__, :progcorrelations)
     ax.set_xlabel("Rank/accept correlation")
     fig.tight_layout()
     fig.savefig("rank-accept_correlation.pdf")
+end
+
+# Program history
+if isdefined(@__MODULE__, :program_history)
+    fig, ax = plt.subplots(1, 1; figsize=(4,4))
+    pds = valtype(program_history)[]
+    shownprogs, proglines = String[], []
+    progxend, progyend = Float64[], Float64[]
+    progxbeg, progybeg = Float64[], Float64[]
+    for (prog, col) in zip(pnames, programcolors)
+        empty!(pds)
+        for yr in 2017:2021
+            pk = ProgramKey(prog, yr)
+            if haskey(program_history, pk)
+                push!(pds, program_history[pk])
+            end
+        end
+        if !isempty(pds)
+            x = [pd.napplicants for pd in pds]
+            y = [pd.target_corrected for pd in pds]
+            push!(proglines, ax.plot(x, y, color="#"*col)[1])
+            push!(shownprogs, prog)
+            ax.plot(x[end], y[end], marker="x", color="#"*col)
+            push!(progxend, x[end])
+            push!(progyend, y[end])
+            push!(progxbeg, x[begin])
+            push!(progybeg, y[begin])
+        end
+    end
+    _, xhi = ax.get_xlim()
+    ax.set_xlim((0, xhi))
+    _, yhi = ax.get_ylim()
+    ax.set_ylim((0, yhi))
+    ols = lm(@formula(y~x), DataFrame("x"=>progxend, "y"=>progyend))
+    ax.plot([0, xhi], predict(ols, DataFrame("x"=>[0, xhi])), color="lightgray", linestyle="--")
+    ols = lm(@formula(y~x), DataFrame("x"=>progxbeg, "y"=>progybeg))
+    ax.plot([0, xhi], predict(ols, DataFrame("x"=>[0, xhi])), color="lightgray", linestyle=":")
+    ax.legend(proglines, shownprogs)
+    ax.set_xlabel("# applicants")
+    ax.set_ylabel("target")
+    fig.tight_layout()
+    fig.savefig("program_history.pdf")
 end
 
 # Distribution of outcomes from vantage point of beginning of the season
@@ -202,17 +245,28 @@ if isdefined(@__MODULE__, :Δl)
     ax.legend(("linear", "hyperbolic"))
     fig.tight_layout()
     fig.savefig("linear_hyperbolic_floors.pdf")
+end
 
-    fig, ax = plt.subplots(1, 1)
-    x = 0.0:0.1:maximum(last, tgtsraw)
-    ax.plot(x, 3 .+ (101-39)/101 * x)
-    ax.plot(x, sqrt.(16 .+ (tgtparams.N′/101)^2 * x.^2))
-    ax.plot(x, x)
-    ax.legend(("linear", "hyperbolic", "raw"))
+# Linear vs hyperbolic floors, raw scheme
+if isdefined(@__MODULE__, :nslots0)
+    fig, ax = plt.subplots(1, 1, figsize=(3,3))
+    x = 0.0:0.1:maximum(last, tgtsra)
+    ax.plot(x, 3 .+ (nslots0-39)/nslots0 * x, color="blue")
+    ax.plot(x, x, "k--")
+    ax.legend(("linear", "raw"))
     ax.set_xlabel("Slots (raw)")
-    ax.set_ylabel("Slots with floor")
+    ax.set_ylabel("Slots with baseline")
     fig.tight_layout()
-    fig.savefig("floor_schemes.pdf")
+    fig.savefig("floor_linear.pdf")
+
+    fig, ax = plt.subplots(1, 1, figsize=(3,3))
+    ax.plot(x, sqrt.(tgtparamsa.n0^2 .+ (tgtparamsa.N′/nslots0)^2 * x.^2), color="orange")
+    ax.plot(x, x, "k--")
+    ax.legend(("hyperbolic", "raw"))
+    ax.set_xlabel("Slots (raw)")
+    ax.set_ylabel("Slots with baseline")
+    fig.tight_layout()
+    fig.savefig("floor_hyperbolic.pdf")
 end
 
 # Votes per faculty
