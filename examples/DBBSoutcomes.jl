@@ -142,7 +142,7 @@ function random_applicants(applicants, past_applicants; pval=0.8)
     while i <= lastindex(perm)
         idx = perm[i]
         app = applicants[idx]
-        newapp = NormalizedApplicant(app.program, app.season, app.normrank, 0.0f0, app.normdecidedate, app.accept)
+        newapp = NormalizedApplicant(PersonalData(), app.program, app.season, app.normrank, 0.0f0, app.normdecidedate, app.accept)
         like = match_likelihood(fmatch, past_applicants, newapp, 0.0f0)
         pmatric = matriculation_probability(like, past_applicants)
         push!(selected, newapp)

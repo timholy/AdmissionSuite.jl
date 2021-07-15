@@ -209,3 +209,9 @@ function match_function(; σr=Inf32, σt=Inf32, progsim=default_similarity)
         return progcoef * exp(-rankpenalty/2 - offerdatepenalty/2)
     end
 end
+
+function fmatch_prog_rank_date(σsel::Real, σyield::Real, σr::Real, σt::Real;
+                               offerdata, yielddata)
+    progsim = cached_similarity(σsel, σyield; offerdata, yielddata)
+    return match_function(; σr, σt, progsim)
+end
