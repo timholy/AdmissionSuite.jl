@@ -69,11 +69,43 @@ Base.:+(a::ProgramData, b::ProgramData) = ProgramData(a.target_raw + b.target_ra
                                                       Date(0))
 
 """
+`PersonalData` holds relevant data about an individual applicant.
+
+$(TYPEDFIELDS)
+"""
+struct PersonalData
+    """
+    `true` if an applicant is an underrepresented minority, disadvantaged, or disabled.
+    """
+    urmdd::Union{Bool,Missing}
+
+    """
+    `true` if an applicant is not a US citizen or permanent resident.
+    """
+    foreign::Union{Bool,Missing}
+end
+
+function PersonalData(; urmdd::Union{Bool,Missing}=missing,
+                        foreign::Union{Bool,Missing}=missing)
+    PersonalData(urmdd, foreign)
+end
+
+function Base.show(io::IO, pd::PersonalData)
+    !ismissing(pd.urmdd) && print(io, "urmdd=", pd.urmdd)
+    !ismissing(pd.foreign) && print(io, "foreign=", pd.foreign)
+end
+
+"""
 `NormalizedApplicant` holds normalized data about an applicant who received, or may receive, an offer of admission.
 
 $(TYPEDFIELDS)
 """
 struct NormalizedApplicant
+    """
+    Individual data about the applicant, see [`PersonalData`](@ref).
+    """
+    applicantdata::PersonalData
+
     """
     The abbreviation of the program the applicant was admitted to.
     `AdmissionsSimulation.program_lookups` contains the list of valid choices, together with their full names.
@@ -114,11 +146,13 @@ struct NormalizedApplicant
 end
 
 """
-    normapp = NormalizedApplicant(; program, rank=missing, offerdate, decidedate=missing, accept=missing, program_history)
+    normapp = NormalizedApplicant(; program, urmdd=missing, foreign=missing, rank=missing, offerdate, decidedate=missing, accept=missing, program_history)
 
 Create an applicant from "natural" units, where rank is an integer and dates are expressed in `Date` format.
 Some are required (those without a default value), others are optional:
 - `program`: a string encoding the program
+- `urmdd`: `true` if applicant is a URM, disadvantaged, or disabled
+- `foreign`: `true` if applicant is not a citizen or permanent resident
 - `rank::Int`: the rank of the applicant compared to other applicants to the same program in the same season.
    Use 1 for the top candidate; the bottom candidate should have rank equal to the number of applications received.
 - `offerdate`: the date on which an offer was (or might be) extended. E.g., `Date("2021-01-13")`.
@@ -128,6 +162,8 @@ Some are required (those without a default value), others are optional:
 `program_history` should be a dictionary mapping [`ProgramKey`](@ref)s to [`ProgramData`](@ref).
 """
 function NormalizedApplicant(; program::AbstractString,
+                               urmdd::Union{Bool,Missing}=missing,
+                               foreign::Union{Bool,Missing}=missing,
                                rank::Union{Integer,Missing}=missing,
                                offerdate::Date,
                                decidedate::Union{Date,Missing}=missing,
@@ -139,11 +175,13 @@ function NormalizedApplicant(; program::AbstractString,
     toffer = normdate(offerdate, pdata)
     tdecide = ismissing(decidedate) ? missing : normdate(decidedate, pdata)
     accept = ismissing(accept) ? missing : accept
-    return NormalizedApplicant(program, season(offerdate), normrank, toffer, tdecide, accept)
+    return NormalizedApplicant(PersonalData(;urmdd, foreign), program, season(offerdate), normrank, toffer, tdecide, accept)
 end
 # This version is useful for, e.g., reading from a CSV.Row
 NormalizedApplicant(applicant; program_history) = NormalizedApplicant(;
     program = applicant.program,
+    urmdd = hasproperty(applicant, :urm) ? applicant.urm : missing,
+    foreign = hasproperty(applicant, :foreign) ? applicant.foreign : missing,
     rank = hasproperty(applicant, :rank) ? applicant.rank : missing,
     offerdate = applicant.offerdate,
     decidedate = hasproperty(applicant, :decidedate) ? applicant.decidedate : missing,

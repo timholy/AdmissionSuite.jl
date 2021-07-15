@@ -197,13 +197,10 @@ end
 
 ## Model training
 
-function collect_predictions!(pmatrics::AbstractVector, accepts::AbstractVector{Bool},
-                              σsel::Real, σyield::Real, σr::Real, σt::Real;
-                              applicants, past_applicants, offerdata, yielddata,
+function collect_predictions!(fmatch::Function, pmatrics::AbstractVector, accepts::AbstractVector{Bool};
+                              applicants, past_applicants,
                               ptail=0.0f0,
                               #= fraction of prior applicants that must match =# minfrac=0.01)
-    progsim = cached_similarity(σsel, σyield; offerdata, yielddata)
-    fmatch = match_function(; σr, σt, progsim)
     nviolations = 0
     for applicant in applicants
         like = match_likelihood(fmatch, past_applicants, applicant, 0.0f0)
@@ -217,53 +214,54 @@ function collect_predictions!(pmatrics::AbstractVector, accepts::AbstractVector{
 end
 
 """
-    match_correlation(σsel::Real, σyield::Real, σr::Real, σt::Real;
-                      applicants, past_applicants, offerdata, yielddata,
-                      ptail=0.0f0, minfrac=0.01)
+    match_correlation(fmatch; applicants, past_applicants, ptail=0.0f0, minfrac=0.01)
 
 Compute the correlation between estimated matriculation probability and decline/accept
 for a list of `applicants`' matriculation decisions.
 This function is used to evaluate the accuracy of predictions made by specific model parameters.
 
-The `σ` arguments are matching parameters, see [`program_similarity`](@ref) and
-[`match_function`](@ref). [`offerdata`](@ref) and [`yielddata`](@ref) are computed
-by functions of the same name. `ptail` is used to clamp the estimated matriculation probability
-between bounds, `clamp(pmatric, ptail, 1-ptail)`.
+`fmatch(reference, applicant, tnow)` is the similarity-computation function.
+`ptail` is used to clamp the estimated matriculation probability between bounds, `clamp(pmatric, ptail, 1-ptail)`.
 `minfrac` expresses the minimum fraction of `past_applicants`
 allowed to be matched; any `test_applicant` matching fewer than these (in the sense of the
 sum of likelihoods computed by [`match_likelihood`](@ref)) leads to a return value of `NaN`.
 """
-function match_correlation(σsel::Real, σyield::Real, σr::Real, σt::Real; kwargs...)
+function match_correlation(fmatch::Function; kwargs...)
     pmatrics, accepts = Float32[], Bool[]
-    iszero(collect_predictions!(pmatrics, accepts, σsel, σyield, σr, σt; kwargs...)) || return NaN32
+    iszero(collect_predictions!(fmatch, pmatrics, accepts; kwargs...)) || return NaN32
     c = cor(pmatrics, accepts)
     return isnan(c) ? 0.0f0 : c
 end
 
+match_correlation(σsel::Real, σyield::Real, σr::Real, σt::Real; offerdata, yielddata, kwargs...) =
+    match_correlation(fmatch_prog_rank_date(σsel, σyield, σr, σt; offerdata, yielddata); kwargs...)
+
 """
-    match_correlation(σsels::AbstractVector, σyields::AbstractVector, σrs::AbstractVector, σts::AbstractVector;
+    match_correlation(matchcreator::Function, σlists::AbstractVector...;
                       applicants, program_history, kwargs...)
 
 Compute the prediction accuracy using historical data. For each year in `program_history` other than the earliest,
 use prior data to predict the probability of matriculation for each applicant.
 
-The `σ` lists contain the values that will be used to compute accuracy; the return value is a 4-dimensional array evaluating
+The `σ` lists contain the values that will be used to compute accuracy; the return value is an n-dimensional array evaluating
 the correlation between estimated matriculation probability and acceptance for all possible combinations of these parameters.
-`σsel` and `σyield` will be used by [`cached_similarity`](@ref) to determine program similarity;
-`σr` and `σs` will be used to measure applicant similarity.
+`matchcreator(σ1, σ2...; offerdata, yielddata)` should return a similarity-computing function `fmatch(template, applicant, tnow)`
+using the specific `σ`s provided.
 
 Tuning essentially corresponds to picking the index of the entry of the return value and then setting each parameter accordingly:
 
 ```julia
-corarray = match_correlation(σsels, σyields, σrs, σts; applicants, program_history)
+corarray = match_correlation(AdmissionsSimulation.fmatch_prog_rank_date, σsels, σyields, σrs, σts; applicants, program_history)
 idx = argmax(corarray)
 σsel, σyield, σr, σt = σsels[idx[1]], σyields[idx[2]], σrs[idx[3]], σts[idx[4]]
 ```
+
+`fmatch_prog_rank_date` is a default and can be omitted if you want to use this function.
 """
-function match_correlation(σsels::AbstractVector, σyields::AbstractVector, σrs::AbstractVector, σts::AbstractVector;
+function match_correlation(matchcreator::Function, σlists::AbstractVector...;
                            applicants, program_history, kwargs...)
     yrmin, yrmax = extrema(app->app.season, applicants)
-    corarray = zeros(Float32, length(σsels), length(σyields), length(σrs), length(σts))
+    corarray = zeros(Float32, map(eachindex, σlists))
     yeardata = map(yrmin+1:yrmax) do yr
         yrapplicants = filter(app -> app.season == yr, applicants)
         prevapplicants = filter(app -> app.season < yr, applicants)
@@ -271,21 +269,25 @@ function match_correlation(σsels::AbstractVector, σyields::AbstractVector, σr
         yd = yielddata(Tuple{Outcome,Outcome,Outcome}, prevapplicants)
         return (yrapplicants, prevapplicants, od, yd)
     end
-    @showprogress "Computing accuracy vs parameters" for k in eachindex(σrs), l in eachindex(σts)
-        σr, σt = σrs[k], σts[l]
-        for i in eachindex(σsels), j in eachindex(σyields)
-            σsel, σyield,  = σsels[i], σyields[j]
-            pmatrics, accepts = Float32[], Bool[]
-            nbad = 0
-            for (yr, yeardat) in zip(yrmin+1:yrmax, yeardata)
-                yrapplicants, prevapplicants, od, yd = yeardat
-                nbad += collect_predictions!(pmatrics, accepts, σsel, σyield, σr, σt;
-                                             applicants=yrapplicants, past_applicants=prevapplicants,
-                                             offerdata=od, yielddata=yd, kwargs...)
-            end
-            c = cor(pmatrics, accepts)
-            corarray[i, j, k, l] = iszero(nbad) ? (isnan(c) ? 0.0f0 : c) : NaN32
+    pmatrics, accepts = Float32[], Bool[]
+    IR = CartesianIndices(map(eachindex, σlists))
+    @showprogress 1 "Computing accuracy vs parameters: " for (I, σs) in zip(IR, Iterators.product(σlists...))
+        empty!(pmatrics)
+        empty!(accepts)
+        nbad = 0
+        for yeardat in yeardata
+            yrapplicants, prevapplicants, od, yd = yeardat
+            fmatch = matchcreator(σs...; offerdata=od, yielddata=yd)
+            nbad += collect_predictions!(fmatch, pmatrics, accepts;
+                                         applicants=yrapplicants, past_applicants=prevapplicants,
+                                         kwargs...)
         end
+        c = cor(pmatrics, accepts)
+        corarray[I] = iszero(nbad) ? (isnan(c) ? 0.0f0 : c) : NaN32
     end
     return corarray
+end
+function match_correlation(σsels::AbstractVector, σyields::AbstractVector, σrs::AbstractVector, σts::AbstractVector;
+                           kwargs...)
+    return match_correlation(fmatch_prog_rank_date, σsels, σyields, σrs, σts; kwargs...)
 end

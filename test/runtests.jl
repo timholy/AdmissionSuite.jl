@@ -398,4 +398,55 @@ end
         nmatric, progstatus = wait_list_analysis(fmatch, past_applicants, test_applicants, Date("2021-01-13"); program_history)
         @test nmatric ≈ 6
     end
+
+    @testset "High-value" begin
+        substnan(A) = [isnan(a) ? oftype(a, -Inf) : a for a in A]
+
+        newprogs = ("ProgA", "ProgB")
+        for prog in newprogs
+            AdmissionsSimulation.addprogram(prog)
+        end
+        # Impact of incorporating high-value applicant status into similarity function.
+        # Such applicants are less likely to come because competition for them across institutions is high.
+        program_history = Dict{ProgramKey,ProgramData}()
+        for prog in ("ProgA", "ProgB"), yr in 2011:2021
+            program_history[ProgramKey(prog, yr)] = ProgramData(slots=10, napplicants=100, firstofferdate=Date("$yr-01-01"), lastdecisiondate=Date("$yr-04-15"))
+        end
+        # Among past applicants, top-ranking and URM candidates are less likely to accept.
+        function linpair(r, r1v1::Pair, r2v2::Pair)
+            r1, v1 = r1v1
+            r2, v2 = r2v2
+            r1 <= r <= r2 || throw(ArgumentError("$r is outside the bounds [$r1, $r2]"))
+            f = (r - r1)/(r2 - r1)
+            return f*v2 + (1-f)*v1
+        end
+        acceptp(r, urm::Bool) = linpair(r, 1=>0.2, 30=>0.7) * (urm ? 0.5 : 1.0)
+        function fmatch_creator(σr, σurm; kwargs...)
+            return function(template::NormalizedApplicant, applicant::NormalizedApplicant, tnow::Union{Real,Missing})
+                dr = template.normrank - applicant.normrank
+                du = template.applicantdata.urmdd - applicant.applicantdata.urmdd
+                return exp(-dr^2/(2*σr^2) - du^2/(2*σurm^2))
+            end
+        end
+        σrs   = [0.01, 0.02, 0.05, 0.1, 0.2, 0.5, 1.0, 2.0]
+        σurms = [0.01, 0.02, 0.05, 0.1, 0.2, 0.5, 1.0, 2.0]
+        nA = nB = 0
+        for i = 1:20
+            past_applicants = vec([(urm = (r + yr) % 3 == 0; NormalizedApplicant(; program=prog, urmdd=urm, rank=r, offerdate=Date("$yr-01-01"), accept=rand()<acceptp(r, urm), program_history)) for prog in ("ProgA", "ProgB"), r in 1:30, yr in 2011:2020])
+            corarray = match_correlation(fmatch_creator, σrs, σurms; applicants=past_applicants, program_history, minfrac=0.25)
+            idx = argmax(substnan(corarray))
+            σr, σurm = σrs[idx[1]], σurms[idx[2]]
+            yr = 2021
+            # ProgA puts more low-probability applicants high on their list
+            prog_candidates = Dict("ProgA" => vec([(urm = (r + yr) % 3 == 0; NormalizedApplicant(; program="ProgA", urmdd=urm,   rank=r, offerdate=Date("$yr-01-01"), program_history)) for r in 1:30]),
+                                   "ProgB" => vec([                          NormalizedApplicant(; program="ProgB", urmdd=false, rank=r, offerdate=Date("$yr-01-01"), program_history)  for r in 1:30]))
+            offers = initial_offers!(fmatch_creator(σr, σurm), prog_candidates, past_applicants, Date("2021-01-01"); program_history)
+            nA += length(offers["ProgA"])
+            nB += length(offers["ProgB"])
+        end
+        @test nA > nB
+        for prog in newprogs
+            AdmissionsSimulation.delprogram(prog)
+        end
+    end
 end
