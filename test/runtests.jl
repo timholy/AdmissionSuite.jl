@@ -432,8 +432,8 @@ end
         σurms = [0.01, 0.02, 0.05, 0.1, 0.2, 0.5, 1.0, 2.0]
         nA = nB = 0
         for i = 1:20
-            past_applicants = vec([(urm = (r + yr) % 3 == 0; NormalizedApplicant(; program=prog, urmdd=urm, rank=r, offerdate=Date("$yr-01-01"), accept=rand()<acceptp(r, urm), program_history)) for prog in ("ProgA", "ProgB"), r in 1:30, yr in 2011:2020])
-            corarray = match_correlation(fmatch_creator, σrs, σurms; applicants=past_applicants, program_history, minfrac=0.25)
+            past_applicants = vec([(urm = (r + yr) % 3 == 0; NormalizedApplicant(; program=prog, urmdd=urm, rank=r, offerdate=Date("$yr-01-01"), accept=rand()<acceptp(r, urm), program_history)) for prog in ("ProgA", "ProgB"), r in 1:30, yr in 2016:2020])
+            corarray = match_correlation(fmatch_creator, σrs, σurms; applicants=past_applicants, program_history, minfrac=0.05)
             idx = argmax(substnan(corarray))
             σr, σurm = σrs[idx[1]], σurms[idx[2]]
             yr = 2021
