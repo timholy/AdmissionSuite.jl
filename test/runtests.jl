@@ -203,6 +203,10 @@ end
         past_applicants = [NormalizedApplicant(; app..., program_history) for app in past_applicants]
 
         applicant = NormalizedApplicant(; program="NS", rank=11, offerdate=Date("2021-01-13"), program_history)
+        io = IOBuffer()
+        show(io, applicant)
+        str = String(take!(io))
+        @test str == "NormalizedApplicant(NS, 2021, normrank=$(Float32(11/302)), normofferdate=0.0, )"
 
         # A match function that heavily weights normalized rank
         fmatch = match_function(σr=0.01, σt=Inf, progsim=(a,b)->true)
@@ -445,6 +449,12 @@ end
             nB += length(offers["ProgB"])
         end
         @test nA > nB
+
+        io = IOBuffer()
+        show(io, NormalizedApplicant(; program="ProgA", urmdd=true, rank=2, offerdate=Date("2021-01-01"), accept=true, program_history))
+        str = String(take!(io))
+        @test str == "NormalizedApplicant(urmdd=true, ProgA, 2021, normrank=0.02, normofferdate=0.0, accept=true)"
+
         for prog in newprogs
             AdmissionsSimulation.delprogram(prog)
         end

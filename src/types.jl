@@ -91,8 +91,8 @@ function PersonalData(; urmdd::Union{Bool,Missing}=missing,
 end
 
 function Base.show(io::IO, pd::PersonalData)
-    !ismissing(pd.urmdd) && print(io, "urmdd=", pd.urmdd)
-    !ismissing(pd.foreign) && print(io, "foreign=", pd.foreign)
+    !ismissing(pd.urmdd) && print(io, "urmdd=", pd.urmdd, ", ")
+    !ismissing(pd.foreign) && print(io, "foreign=", pd.foreign, ", ")
 end
 
 """
@@ -188,6 +188,18 @@ NormalizedApplicant(applicant; program_history) = NormalizedApplicant(;
     accept = hasproperty(applicant, :accept) ? applicant.accept : missing,
     program_history
 )
+
+function Base.show(io::IO, app::NormalizedApplicant)
+    print(io, "NormalizedApplicant(")
+    print(io, app.applicantdata)
+    print(io, app.program, ", ")
+    print(io, app.season, ", ")
+    !ismissing(app.normrank) && print(io, "normrank=", app.normrank, ", ")
+    print(io, "normofferdate=", app.normofferdate, ", ")
+    !ismissing(app.normdecidedate) && print(io, "normdecidedate=", app.normdecidedate, ", ")
+    !ismissing(app.accept) && print(io, "accept=", app.accept)
+    print(io, ")")
+end
 
 ProgramKey(app::NormalizedApplicant) = ProgramKey(app.program, app.season)
 
