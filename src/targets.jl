@@ -134,7 +134,6 @@ function faculty_effort(facrecs::ListPairs{String,FacultyRecord},
     uprogs, ufacs = sort(collect(uprogs)), sort(collect(ufacs))
     proglkup = Dict(zip(uprogs, 1:length(uprogs)))
     faclkup = Dict(zip(ufacs, 1:length(ufacs)))
-    ndays = eltype(daterange) === Date ? length(daterange) : length(daterange) * 365
     thisyear = year(finaldate)
     dayrange = eltype(daterange) === Date ? daterange : (Date(minimum(daterange), 1, 1):Day(1):Date(min(thisyear, maximum(daterange)), 12, 31))
     progdays = Dict(name => Date(minimum(yrrng), 1, 1):Day(1):Date(min(thisyear, maximum(yrrng)), 12, 31) for (name, yrrng) in progyears)

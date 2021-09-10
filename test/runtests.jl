@@ -62,14 +62,14 @@ end
         @test progsvc["BIDS"] == Service(5, 0)
         @test progsvc["BBSB"] == Service(0, 3)
         @test progsvc["HSG"] == Service(11, 1)
-        sc = calibrate_service(progsvc)
-        @test sc == calibrate_service(facrecords)
+        sc = calibrate_service(progsvc, 2019)
+        @test sc == calibrate_service(facrecords, 2019)
         @test sc.c_per_i ≈ 1/11
         @test AdmissionsSimulation.total(Service(1, 0), sc)  ≈ 11.1/11
         @test AdmissionsSimulation.total(Service(0, 1), sc)  ≈ 11.1
         @test AdmissionsSimulation.total(Service(11, 1), sc) ≈ 11.1       # we use max over interview and committees
         @test AdmissionsSimulation.total(Service(12, 1), sc) ≈ 12/11 * 11.1
-        facs, progs, E = faculty_effort(facrecords, 2021:2021; sc)
+        facs, progs, E = faculty_effort(facrecords, Date("2021-01-01"):Day(1):Date("2021-05-31"); sc)
         fiis = Dict(zip(progs, faculty_involvement(E; scheme=:thresheffort)))
         @test fiis["BBSB"] == 3
         @test fiis["BIDS"] == 2
