@@ -45,16 +45,19 @@ end
 # Assign slots with a floor
 tgtshf, tgtparamsf = targets(program_napplicants, program_nfaculty, nslots, minfloor)
 tgtshft = AdmissionsSimulation.targets_linear(program_napplicants, program_nfacultyt, nslots, 3)
+tgtmin, tgtminparams = AdmissionsSimulation.targets_min(program_napplicants, program_nfaculty, nslots, 4)
 tgtsha, tgtparamsa = targets(program_napplicants, nothing, nslots, minfloor)
 tgtsra = targets(program_napplicants, nothing, nslots)
 # Apply adds
 for (prog, n) in addprogs
     tgtshf[prog] += n
     tgtshft[prog] += n
+    tgtmin[prog] += n
     tgtsha[prog] += n
     tgtsra[prog] += n
 end
 @assert sum(values(tgtshf)) ≈ nslots0
+@assert sum(values(tgtmin)) ≈ nslots0
 @assert sum(values(tgtsha)) ≈ nslots0
 
 dftweaks = DataFrame("" => String[], [name=>Float32[] for name in pnames]...)

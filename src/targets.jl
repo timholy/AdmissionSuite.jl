@@ -280,5 +280,36 @@ function targets_linear(program_napplicants, program_nfaculty, N, per_program_gi
     return tgts
 end
 
+# Bump below-threshold programs up to threshold, leave rest alone
+# This has a "kink" in the curve, which might be a disadvantage.
+# An advantage is that it is the most parsimonious option in terms of reserving slots.
+function targets_min(program_napplicants, program_nfaculty, N, minslots)
+    weights = Float32[]
+    for (program, napplicants) in program_napplicants
+        push!(weights, sqrt(napplicants * program_nfaculty[program]))
+    end
+    W = sum(weights)
+
+    slots(Nsave) = max.(minslots, (N-Nsave) .* weights ./ W)
+    function constraints!(F, x)
+        Nsave = x[1]
+        s = slots(Nsave)
+        F[1] = sum(s) - N               # enforces sum(s) == N
+        return F
+    end
+
+    Nsave = 0.0
+    ns = slots(Nsave)
+    if minimum(ns) < minslots || sum(ns) > N+0.01
+        ret = nlsolve(constraints!, Float64[Nsave])
+        converged(ret) || @error("targets failed to converge")
+        Nsave = ret.zero[1]
+        ns = slots(Nsave)
+    end
+
+    return Dict(program => sᵢ for (program, sᵢ) in zip(keys(program_napplicants), ns)), (minslots=minslots, Nsave=Nsave)
+end
+
+
 rawweight(napplicants, program_nfaculty, program) = sqrt(napplicants * get(program_nfaculty, program, zero(valtype(program_nfaculty))))
 rawweight(napplicants, ::Nothing, program) = napplicants
