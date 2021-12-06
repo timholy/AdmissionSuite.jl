@@ -15,7 +15,7 @@ pairs containing details about the affiliations of each faculty member (see [`Fa
   they would be assigned a ratio of 3 to 2 to 1.  Hence the primary program would get 3/6=0.5,
   secondary 2/6=0.33, and tertiary 1/6=0.17.
 """
-function faculty_affiliations(facrecs::ListPairs{String,FacultyRecord}, scheme::Symbol=:primary)
+function faculty_affiliations(facrecs::ListPairs{<:AbstractString,FacultyRecord}, scheme::Symbol=:primary)
     naffil = Dict{String,Float32}()
     for (_, facrec) in facrecs
         add_affiliations!(naffil, facrec, scheme)
@@ -64,7 +64,7 @@ end
 
 Compute the total service for each program. `progsvc` is a `Dict(progname => ::Service)`.
 """
-function program_service(facrecs::ListPairs{String,FacultyRecord})
+function program_service(facrecs::ListPairs{<:AbstractString,FacultyRecord})
     progsvc = Dict{String,Service}()
     for (_, facrec) in facrecs
         for (prog, s) in facrec.service
@@ -84,7 +84,7 @@ useful for calibration.
 
 `sc` allows a calculation of total service based on the maximum score computed from interviews or from committees.
 """
-function calibrate_service(progsvc::ListPairs{String,Service}, yrthresh = year(today())-7)
+function calibrate_service(progsvc::ListPairs{<:AbstractString,Service}, yrthresh = year(today())-7)
     progrange = merge_program_range!(copy(program_range), default_program_substitutions)
     progsvc = sort(collect(progsvc); by=first)
     isold = [minimum(progrange[prog]) < yrthresh for (prog, _) in progsvc]
@@ -100,7 +100,7 @@ function calibrate_service(progsvc::ListPairs{String,Service}, yrthresh = year(t
     t_per_u = svcunit \ svctime
     return ServiceCalibration(c_per_i, t_per_u)
 end
-calibrate_service(facrecs::ListPairs{String,FacultyRecord}, args...) =
+calibrate_service(facrecs::ListPairs{<:AbstractString,FacultyRecord}, args...) =
     calibrate_service(program_service(facrecs), args...)
 
 """
@@ -118,7 +118,7 @@ modern equivalents.
 On output, `E` is a `length(faculty)`-by-`length(programs)` matrix, where `E[j,i]` measures the average annual effort committed
 by faculty member `faculty[j]` to `programs[i]`.
 """
-function faculty_effort(facrecs::ListPairs{String,FacultyRecord},
+function faculty_effort(facrecs::ListPairs{<:AbstractString,FacultyRecord},
                         daterange::AbstractRange{<:Union{Integer,Date}};
                         sc=nothing,
                         progyears=merge_program_range!(copy(program_range), default_program_substitutions),
