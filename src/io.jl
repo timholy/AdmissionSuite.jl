@@ -10,7 +10,7 @@ Read program history from a file. See "$(@__DIR__)/test/data/programdata.csv" fo
 function read_program_history(filename::AbstractString)
     _, ext = splitext(filename)
     ext ∈ (".csv", ".tsv") || error("only CSV files may be read")
-    rows = CSV.Rows(filename; types=Dict("year"=>Int, "program"=>String, "slots"=>Int, "nmatriculants"=>Int, "napplicants"=>Int, "lastdecisiondate"=>Date))
+    rows = CSV.Rows(filename; types=Dict("year"=>Int, "program"=>String, "slots"=>Int, "nmatriculants"=>Int, "napplicants"=>Int, "lastdecisiondate"=>Date), validate=false)
     try
         return Dict(map(rows) do row
             ProgramKey(season=row.year, program=row.program) => ProgramData(slots=row.slots,

@@ -145,11 +145,11 @@ function aggregate(facrec::FacultyRecord, mergepairs, covered=Set{String}())
 end
 
 """
-    facrecsnew = aggregate(facrecs::ListPairs{String,FacultyRecord}, mergepairs)
+    facrecsnew = aggregate(facrecs::ListPairs{<:AbstractString,FacultyRecord}, mergepairs)
 
 Aggregate faculty records, merging program `from => to` pairs from `mergepairs`.
 """
-function aggregate(facrecs::ListPairs{String,FacultyRecord}, mergepairs)
+function aggregate(facrecs::ListPairs{<:AbstractString,FacultyRecord}, mergepairs)
     covered = Set{String}()
     return [name=>aggregate(facrec, mergepairs, covered) for (name, facrec) in facrecs]
 end
