@@ -9,6 +9,7 @@ using Statistics
 using DataStructures
 using NLsolve
 using ProgressMeter
+using Dash
 
 # Types
 export ProgramKey, ProgramData, PersonalData, NormalizedApplicant, Outcome, ProgramYieldPrediction, Service, FacultyRecord
@@ -29,5 +30,6 @@ include("targets.jl")
 include("similarity.jl")
 include("predict.jl")
 include("io.jl")
+include("web.jl")
 
 end

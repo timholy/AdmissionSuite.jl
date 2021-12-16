@@ -210,6 +210,14 @@ function match_function(; σr=Inf32, σt=Inf32, progsim=default_similarity)
     end
 end
 
+function match_function(past_applicants::AbstractVector{NormalizedApplicant}, program_history::AbstractDict{ProgramKey, ProgramData};
+                        σsel=Inf32, σyield=Inf32, kwargs...)
+    offerdat = offerdata(past_applicants, program_history)
+    yielddat = yielddata(Tuple{Outcome,Outcome,Outcome}, past_applicants)
+    progsim = cached_similarity(σsel, σyield; offerdata=offerdat, yielddata=yielddat)
+    return match_function(; kwargs..., progsim)
+end
+
 function fmatch_prog_rank_date(σsel::Real, σyield::Real, σr::Real, σt::Real;
                                offerdata, yielddata)
     progsim = cached_similarity(σsel, σyield; offerdata, yielddata)
