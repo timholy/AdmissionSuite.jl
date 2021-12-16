@@ -53,11 +53,16 @@ function visualize(fetch_past_applicants::Function, fetch_applicants::Function, 
     _season = season(get_tnow(tnow))
 
     applicants = Ref(fetch_applicants())
+    progs = sort(unique(app.program for app in applicants[]))
     target = compute_target(program_history, _season)
 
-    # progs = sort(unique(app.program for app in applicants))
-
     target_input = dcc_input(id="total-target", value=compute_target(program_history, season(get_tnow(tnow))), type="number")
+    program_sel = dcc_dropdown(
+        id = "program-selector",
+        options = [(label=prog, value=prog) for prog in progs],
+        value = first(progs),
+        style = Dict("width" => "120px"),
+    )
     refresh_btn = dbc_button("Refresh applicants", id="refresh-button", n_clicks=0, color="primary", class_name="me-1")
 
     tabs = html_div([
@@ -80,6 +85,7 @@ function visualize(fetch_past_applicants::Function, fetch_applicants::Function, 
         [html_div([html_div([dbc_label("Total target: "),
                              target_input,
                             ]),
+                   program_sel,
                    refresh_btn,
                   ], className = "d-grid gap-2 d-md-flex justify-content-md-end"),
          tabs,
@@ -87,12 +93,12 @@ function visualize(fetch_past_applicants::Function, fetch_applicants::Function, 
     end
 
     # Tab-switcher callback
-    callback!(app, Output("content", "children"), Input("tabs", "active_tab"), Input("total-target", "value"), Input("refresh-button", "n_clicks")) do active_tab, tgt, _
+    callback!(app, Output("content", "children"), Input("tabs", "active_tab"), Input("total-target", "value"), Input("program-selector", "value"), Input("refresh-button", "n_clicks")) do active_tab, tgt, prog, _
         if active_tab == "tab-summary"
             target = tgt
             return render_tab_summary(fmatch, past_applicants, applicants[], get_tnow(tnow), program_history, target)
         elseif active_tab == "tab-program"
-            return render_program_zoom()
+            return render_program_zoom(fmatch, past_applicants, filter(app->app.program==prog, applicants[]), get_tnow(tnow), program_history[ProgramKey(prog, _season)])
         elseif active_tab == "tab-internals"
             return render_internals()
         else
@@ -163,6 +169,38 @@ function render_tab_summary(fmatch, past_applicants, applicants, tnow::Date, pro
     )
 end
 
-render_program_zoom() = html_p("Program zoom")
+function render_program_zoom(fmatch, past_applicants, applicants, tnow::Date, pd::ProgramData)
+    function calc_pmatric(applicant)  # TODO? copied from add_offers!, would be better not to copy but it's a closure...
+        ntnow = normdate(tnow, pd)
+        applicant.normdecidedate !== missing && applicant.normdecidedate <= ntnow && return Float32(applicant.accept)
+        like = match_likelihood(fmatch, past_applicants, applicant, ntnow)
+        return matriculation_probability(like, past_applicants)
+    end
+    accepted, declined, undecided = eltype(applicants)[], eltype(applicants)[], eltype(applicants)[]
+    for app in applicants
+        if app.accept === true
+            push!(accepted, app)
+        elseif app.accept === false
+            push!(declined, app)
+        else
+            push!(undecided, app)
+        end
+    end
+    return dbc_card(
+        dbc_cardbody([
+            html_h2("Accepted:"),
+            html_table(html_tbody([html_tr([html_td(app.applicantdata.name)]) for app in accepted])),
+            html_br(),
+            html_h2("Declined:"),
+            html_table(html_tbody([html_tr([html_td(app.applicantdata.name)]) for app in declined])),
+            html_br(),
+            html_h2("Pending:"),
+            html_table([
+                html_thead(html_tr([html_th(col) for col in ("Candidate", "Probability")])),
+                html_tbody([html_tr([html_td(app.applicantdata.name), html_td(calc_pmatric(app))]) for app in undecided]),
+            ]),
+        ])
+    )
+end
 
 render_internals() = html_p("Internals")
