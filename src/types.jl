@@ -75,6 +75,11 @@ $(TYPEDFIELDS)
 """
 struct PersonalData
     """
+    Name of the applicant
+    """
+    name::String
+
+    """
     `true` if an applicant is an underrepresented minority, disadvantaged, or disabled.
     """
     urmdd::Union{Bool,Missing}
@@ -85,12 +90,13 @@ struct PersonalData
     foreign::Union{Bool,Missing}
 end
 
-function PersonalData(; urmdd::Union{Bool,Missing}=missing,
-                        foreign::Union{Bool,Missing}=missing)
-    PersonalData(urmdd, foreign)
+function PersonalData(name=""; urmdd::Union{Bool,Missing}=missing,
+                               foreign::Union{Bool,Missing}=missing)
+    PersonalData(name, urmdd, foreign)
 end
 
 function Base.show(io::IO, pd::PersonalData)
+    !isempty(pd.name) && print(io, pd.name, ", ")
     !ismissing(pd.urmdd) && print(io, "urmdd=", pd.urmdd, ", ")
     !ismissing(pd.foreign) && print(io, "foreign=", pd.foreign, ", ")
 end
@@ -161,7 +167,8 @@ Some are required (those without a default value), others are optional:
 
 `program_history` should be a dictionary mapping [`ProgramKey`](@ref)s to [`ProgramData`](@ref).
 """
-function NormalizedApplicant(; program::AbstractString,
+function NormalizedApplicant(; name::AbstractString="",
+                               program::AbstractString,
                                urmdd::Union{Bool,Missing}=missing,
                                foreign::Union{Bool,Missing}=missing,
                                rank::Union{Integer,Missing}=missing,
@@ -175,7 +182,7 @@ function NormalizedApplicant(; program::AbstractString,
     toffer = normdate(offerdate, pdata)
     tdecide = ismissing(decidedate) ? missing : normdate(decidedate, pdata)
     accept = ismissing(accept) ? missing : accept
-    return NormalizedApplicant(PersonalData(;urmdd, foreign), program, season(offerdate), normrank, toffer, tdecide, accept)
+    return NormalizedApplicant(PersonalData(name; urmdd, foreign), program, season(offerdate), normrank, toffer, tdecide, accept)
 end
 # This version is useful for, e.g., reading from a CSV.Row
 NormalizedApplicant(applicant; program_history) = NormalizedApplicant(;
@@ -212,11 +219,16 @@ struct Outcome
     ndeclines::Int
     naccepts::Int
 end
-Base.zero(::Type{Outcome}) = Outcome(0, 0)
+Outcome() = Outcome(0, 0)
+Base.zero(::Type{Outcome}) = Outcome()
 Base.show(io::IO, outcome::Outcome) = print(io, "(d=", outcome.ndeclines, ", a=", outcome.naccepts, ")")
 Base.:+(a::Outcome, b::Outcome) = Outcome(a.ndeclines + b.ndeclines, a.naccepts + b.naccepts)
 total(outcome::Outcome) = outcome.ndeclines + outcome.naccepts
 
+function Outcome(app::NormalizedApplicant)
+    accept = app.accept
+    return Outcome(accept===false, accept===true)
+end
 
 """
 `ProgramYieldPrediction` records mid-season predictions and data for a particular program.
