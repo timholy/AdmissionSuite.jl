@@ -94,6 +94,12 @@ function PersonalData(name=""; urmdd::Union{Bool,Missing}=missing,
                                foreign::Union{Bool,Missing}=missing)
     PersonalData(name, urmdd, foreign)
 end
+function PersonalData(pd::PersonalData; kwargs...)
+    name = haskey(kwargs, :name) ? kwargs[:name] : pd.name
+    urmdd = haskey(kwargs, :urmdd) ? kwargs[:urmdd] : pd.urmdd
+    foreign = haskey(kwargs, :foreign) ? kwargs[:foreign] : pd.foreign
+    return PersonalData(name, urmdd, foreign)
+end
 
 function Base.show(io::IO, pd::PersonalData)
     !isempty(pd.name) && print(io, pd.name, ", ")
@@ -119,7 +125,7 @@ struct NormalizedApplicant
     program::String
 
     """
-    The year in which the applicant's decision was due. E.g., if the last date was April 15th, 2021, this would be 2021.
+    The year in which the applicant's decision was due. E.g., if the decision deadline was April 15th, 2021, this would be 2021.
     """
     season::Int16
 
@@ -184,7 +190,43 @@ function NormalizedApplicant(; name::AbstractString="",
     accept = ismissing(accept) ? missing : accept
     return NormalizedApplicant(PersonalData(name; urmdd, foreign), program, season(offerdate), normrank, toffer, tdecide, accept)
 end
-# This version is useful for, e.g., reading from a CSV.Row
+# replacing/updating values
+function NormalizedApplicant(applicant::NormalizedApplicant; kwargs...)
+    _season, normofferdate, normdecidedate = applicant.season, applicant.normofferdate, applicant.normdecidedate
+    program = haskey(kwargs, :program) ? validateprogram(kwargs[:program]) : applicant.program
+    normrank = applicant.normrank
+    if haskey(kwargs, :program_history)
+        program_history = kwargs[:program_history]
+        if haskey(kwargs, :offerdate)
+            _season = season(kwargs[:offerdate])
+        end
+        pdata = program_history[ProgramKey(program, _season)]
+        if haskey(kwargs, :offerdate)
+            normofferdate = normdate(kwargs[:offerdate], program_history)
+        end
+        if haskey(kwargs, :decidedate)
+            normdecidedate = normdate(kwargs[:decidedate], program_history)
+        end
+        if haskey(kwargs, :rank)
+            normrank = applicant_score(kwargs[:rank], pdata)
+        end
+    else
+        haskey(kwargs, :offerdate) || haskey(kwargs, :decidedate) || haskey(kwargs, :rank) &&
+            error("supplying offerdate, decidedate, or rank requires `program_history`")
+    end
+
+    NormalizedApplicant(
+        PersonalData(applicant.applicantdata; kwargs...),
+        program,
+        _season,
+        normrank,
+        normofferdate,
+        normdecidedate,
+        haskey(kwargs, :accept) ? kwargs[:accept] : applicant.accept,
+    )
+end
+
+# This version is useful for, e.g., reading from a CSV.Row (see test/data)
 NormalizedApplicant(applicant; program_history) = NormalizedApplicant(;
     program = applicant.program,
     urmdd = hasproperty(applicant, :urm) ? applicant.urm : missing,

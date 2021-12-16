@@ -408,6 +408,10 @@ end
         # Just make sure this runs
         nmatric, progstatus = wait_list_analysis(fmatch, past_applicants, test_applicants, Date("2021-01-13"); program_history)
         @test nmatric ≈ 6
+        # Also with unknown decision dates
+        test_applicants = [NormalizedApplicant(app; normdecidedate=missing) for app in test_applicants]
+        nmatric, progstatus = wait_list_analysis(fmatch, past_applicants, test_applicants, Date("2021-01-13"); program_history)
+        @test nmatric ≈ 6
     end
 
     @testset "High-value" begin

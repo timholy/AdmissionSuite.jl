@@ -86,7 +86,9 @@ function wait_list_analysis(fmatch::Function,
         # Select applicants to this program who already have an offer
         papplicants = filter(app -> app.program == progname && (app.normofferdate < ntnow || iszero(app.normofferdate)), applicants)
         ppmatrics = map(papplicants) do applicant
-            applicant.normdecidedate <= ntnow && return Float32(applicant.accept)
+            if !ismissing(applicant.normdecidedate)
+                applicant.normdecidedate <= ntnow && return Float32(applicant.accept)
+            end
             like = match_likelihood(fmatch, past_applicants, applicant, ntnow)
             return matriculation_probability(like, past_applicants)
         end
