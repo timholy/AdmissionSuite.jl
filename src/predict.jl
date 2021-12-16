@@ -65,7 +65,8 @@ priority(pred, target) = (target - pred)/sqrt(target)
                                              actual_yield=nothing)
 
 Compute the estimated number `nmatric` of matriculants and the program-specific yield prediction and wait-list priority, `progstatus`.
-`progstatus` is a mapping `progname => progyp::ProgramYieldPrediction` (see [`ProgramYieldPrediction`](@ref)).
+`progstatus` is a mapping `progname => progyp::ProgramYieldPrediction` (see [`ProgramYieldPrediction`](@ref)). `nmatric` assumes all
+`applicants` get offers.
 
 The arguments are similarly to [`match_likelihood`](@ref). If you're doing a post-hoc analysis, `actual_yield` can be a
 `Dict(progname => nmatric)`, in which case the p-value for the observed outcome will also be stored in `progstatus`.
@@ -116,11 +117,13 @@ function wait_list_analysis(fmatch::Function,
 end
 
 """
-    nmatric = add_offers!(fmatch, program_offers::Dict, program_candidates::Dict, past_applicants, tnow::Date=today(), σthresh=2; program_history)
+    nmatric, pq0=>pq = add_offers!(fmatch, program_offers::Dict, program_candidates::Dict, past_applicants, tnow::Date=today(), σthresh=2; program_history)
 
 Transfer applicants from `program_candidates` to `program_offers` depending on whether projections in `nmatric` are below DBBS-wide
-target by at least `σthresh` standard deviations.  `nmatric` is computed upon entrance, and does not reflect updated projections after
-adding offers. `tnow` should be the date for which the computation should be performed, and is used to determine whether candidates
+target by at least `σthresh` standard deviations.  `nmatric0` is computed upon entrance, while `nmatric` reflects updated projections after
+adding offers. Likewise `pq0` is the program-priority initially, and `pq` after adding offers.
+
+`tnow` should be the date for which the computation should be performed, and is used to determine whether candidates
 have already informed us of their decision.
 
 Programs are prioritized for offers by the deficit divided by the expected noise.
@@ -131,6 +134,7 @@ function add_offers!(fmatch::Function,
                      past_applicants::AbstractVector{NormalizedApplicant},
                      tnow::Date=today(),
                      σthresh::Real=2;
+                     target::Union{Int,Nothing}=nothing,
                      program_history)
     function calc_pmatric(applicant, pd = program_history[ProgramKey(applicant)])
         ntnow = normdate(tnow, pd)
@@ -141,7 +145,9 @@ function add_offers!(fmatch::Function,
     pq = PriorityQueue{String,Float32}(Base.Order.Reverse)
     # Compute the total target
     _season = season(tnow)
-    target = compute_target(program_history, _season)
+    if target === nothing
+        target = compute_target(program_history, _season)
+    end
     # Estimate our current class size
     ppmatrics = Dict{String,Vector{Float32}}()
     allpmatrics = Float32[]
@@ -152,8 +158,8 @@ function add_offers!(fmatch::Function,
         append!(allpmatrics, pmatrics)
     end
     nmatrics = run_simulation(allpmatrics, 1000)
-    nmatric = mean(nmatrics) ± std(nmatrics)
-    nmatric.val + σthresh * nmatric.err > target && return nmatric, pq
+    nmatric0 = nmatric = mean(nmatrics) ± std(nmatrics)
+    nmatric.val + σthresh * nmatric.err > target && return nmatric=>nmatric, pq=>copy(pq)
     # Iteratively add candidates by program-priority
     for (program, pmatrics) in ppmatrics
         pd = program_history[ProgramKey(program, _season)]
@@ -162,7 +168,7 @@ function add_offers!(fmatch::Function,
         pq[program] = priority(sum(pmatrics), tgt)
     end
     pq0 = copy(pq)
-    while true
+    while !isempty(pq)
         program, p = dequeue_pair!(pq)
         p < zero(p) && continue
         candidates = program_candidates[program]
@@ -177,9 +183,10 @@ function add_offers!(fmatch::Function,
         tgt = pd.target_corrected
         pq[program] = priority(sum(pmatrics), tgt)
         nmatrics = run_simulation(allpmatrics, 1000)
-        mean(nmatrics) + σthresh * std(nmatrics) > target && break
+        nmatric = mean(nmatrics) ± std(nmatrics)
+        nmatric.val + σthresh * nmatric.err > target && break
     end
-    return nmatric, pq0
+    return nmatric0 => nmatric, pq0 => pq
 end
 
 """

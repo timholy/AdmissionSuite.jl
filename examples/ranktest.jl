@@ -154,7 +154,7 @@ for σthresh in (1, 2, 3)
     local offers = Pair{Date,Vector{String}}[]
     for d in Date("2021-01-02"):Day(1):Date("2021-04-14")
         lens = Dict(prog => length(list) for (prog, list) in program_offers)
-        push!(class_size_projection, d=>add_offers!(fmatch, program_offers, program_candidates, past_applicants, d, σthresh; program_history))
+        push!(class_size_projection, d=>add_offers!(fmatch, program_offers, program_candidates, past_applicants, d, σthresh; program_history)[1].second)
         local newoffers = String[]
         for (prog, list) in program_offers
             for _ = 1:length(list) -lens[prog]

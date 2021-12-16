@@ -380,7 +380,7 @@ end
         @test all(list -> length(list) == 6, values(program_offers))
         @test all(list -> length(list) == 1, values(program_candidates))
         # By 1/16, many decisions would have been rendered. CB got all 3, NS got 2.
-        nmatric, pq = add_offers!(fmatch, program_offers, program_candidates, past_applicants, Date("2021-01-16"), 0.25; program_history)
+        (nmatric, _), (_, pq) = add_offers!(fmatch, program_offers, program_candidates, past_applicants, Date("2021-01-16"), 0.25; program_history)
         @test length(program_offers["NS"]) == 7
         @test length(program_offers["CB"]) == 6
         @test length(program_candidates["NS"]) == 0
