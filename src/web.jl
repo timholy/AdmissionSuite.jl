@@ -100,7 +100,7 @@ function visualize(fetch_past_applicants::Function, fetch_applicants::Function, 
         elseif active_tab == "tab-program"
             return render_program_zoom(fmatch, past_applicants, filter(app->app.program==prog, applicants[]), get_tnow(tnow), program_history[ProgramKey(prog, _season)])
         elseif active_tab == "tab-internals"
-            return render_internals()
+            return render_internals(progsim, progs)
         else
             return html_p("This shouldn't ever be displayed...")
         end
@@ -211,4 +211,20 @@ function render_program_zoom(fmatch, past_applicants, applicants, tnow::Date, pd
     )
 end
 
-render_internals() = html_p("Internals")
+function render_internals(progsim, progs)
+    psim = [[progsim(px, py) for px in progs] for py in progs]
+    return dbc_card(
+        dbc_cardbody([
+            dcc_graph(
+                id = "progsim",
+                figure = (
+                    data = [
+                        (x = progs, y = progs, z = psim, type = "heatmap", transpose = "true"),
+                     ],
+                     layout = (title = "Program similarity", yaxis = (scaleanchor = "x",)),
+                ),
+            )
+        ]),
+        style = Dict("width" => 500),
+    )
+end
