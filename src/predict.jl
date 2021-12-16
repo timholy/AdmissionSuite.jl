@@ -140,13 +140,13 @@ function add_offers!(fmatch::Function,
     end
     pq = PriorityQueue{String,Float32}(Base.Order.Reverse)
     # Compute the total target
-    season = year(tnow)
-    target = compute_target(program_history, season)
+    _season = season(tnow)
+    target = compute_target(program_history, _season)
     # Estimate our current class size
     ppmatrics = Dict{String,Vector{Float32}}()
     allpmatrics = Float32[]
     for (program, list) in program_offers
-        pd = program_history[ProgramKey(program, season)]
+        pd = program_history[ProgramKey(program, _season)]
         pmatrics = calc_pmatric.(list, (pd,))
         ppmatrics[program] = pmatrics
         append!(allpmatrics, pmatrics)
@@ -156,7 +156,7 @@ function add_offers!(fmatch::Function,
     nmatric.val + σthresh * nmatric.err > target && return nmatric, pq
     # Iteratively add candidates by program-priority
     for (program, pmatrics) in ppmatrics
-        pd = program_history[ProgramKey(program, season)]
+        pd = program_history[ProgramKey(program, _season)]
         tgt = pd.target_corrected
         tgt == 0 && continue
         pq[program] = priority(sum(pmatrics), tgt)
@@ -173,7 +173,7 @@ function add_offers!(fmatch::Function,
         pmatrics = ppmatrics[program]
         push!(pmatrics, pmatric)
         push!(allpmatrics, pmatric)
-        pd = program_history[ProgramKey(program, season)]
+        pd = program_history[ProgramKey(program, _season)]
         tgt = pd.target_corrected
         pq[program] = priority(sum(pmatrics), tgt)
         nmatrics = run_simulation(allpmatrics, 1000)

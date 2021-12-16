@@ -119,7 +119,7 @@ for tnow in (Date("$lastyear-03-15"), Date("$lastyear-04-01"))
     ntarget = 0
     for pname in pnames
         status = progstatus[pname]
-        progkey = ProgramKey(pname, year(tnow))
+        progkey = ProgramKey(pname, AdmissionsSimulation.season(tnow))
         progdata = program_history[progkey]
         push!(datedf, (pname, progdata.target_corrected, status.nmatriculants, round(status.priority; digits=2), get(foffers, pname, 0), progdata.nmatriculants, status.poutcome))
         ntarget += progdata.target_corrected

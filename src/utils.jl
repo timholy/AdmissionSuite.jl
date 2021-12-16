@@ -139,7 +139,7 @@ function compute_target(program_history, season::Integer)
     end
     return target
 end
-compute_target(program_history, tnow::Date) = compute_target(program_history, year(tnow))
+compute_target(program_history, tnow::Date) = compute_target(program_history, season(tnow))
 
 ## aggregate
 
