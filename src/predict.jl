@@ -140,10 +140,7 @@ function add_offers!(fmatch::Function,
     end
     # Compute the total target
     season = year(tnow)
-    target = 0
-    for program in keys(program_candidates)
-        target += program_history[ProgramKey(program, season)].target_corrected
-    end
+    target = compute_target(program_history, season)
     # Estimate our current class size
     ppmatrics = Dict{String,Vector{Float32}}()
     allpmatrics = Float32[]

@@ -131,6 +131,16 @@ ratio0(a, b) = iszero(a) ? a/oneunit(b) : a/b
 #     total(contrib, trange)
 # end
 
+function compute_target(program_history, season::Integer)
+    target = 0
+    for (pk, pd) in program_history
+        pk.season == season || continue
+        target += pd.target_corrected
+    end
+    return target
+end
+compute_target(program_history, tnow::Date) = compute_target(program_history, year(tnow))
+
 ## aggregate
 
 """
