@@ -88,9 +88,32 @@ null(::Type{NTuple{N,T}}) where {N,T} = ntuple(_ -> zero(T), N)
 
 Express `t` as a fraction of the gap between the first offer date and last decision date as stored in
 `pdata` (see [`ProgramData`](@ref)).
+
+# Examples
+
+```jldoctest; setup=:(using AdmissionsSimulation)
+julia> using Dates
+
+julia> pd = ProgramData(firstofferdate=Date("2021-02-11"), lastdecisiondate=Date("2021-04-15"))
+ProgramData(0, 0, 0, 0, Date("2021-02-11"), Date("2021-04-15"))
+
+julia> normdate(Date("2021-02-11"), pd)
+0.0f0
+
+julia> normdate(Date("2021-04-15"), pd)
+1.0f0
+
+julia> normdate(Date("2021-03-15"), pd)
+0.50793654f0
+
+julia> normdate(Date("2021-01-01"), pd)    # dates prior to the first offer date are negatve
+-0.6507937f0
+```
 """
 function normdate(t::Date, pdata::ProgramData)
-    clamp((t - pdata.firstofferdate) / (pdata.lastdecisiondate - pdata.firstofferdate), 0, 1)
+    nt = (t - pdata.firstofferdate) / (pdata.lastdecisiondate - pdata.firstofferdate)
+    return Float32(nt)
+    # return clamp(Float32(nt), 0, 1)
 end
 normdate(t::Real, pdata) = t
 

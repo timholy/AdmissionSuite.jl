@@ -12,6 +12,13 @@ function countby(list)
 end
 
 @testset "AdmissionsSimulation.jl" begin
+    @testset "normdate" begin
+        pd = ProgramData(firstofferdate=Date("2021-02-11"), lastdecisiondate=Date("2021-04-15"))
+        @test normdate(Date("2021-02-11"), pd) == 0.0f0
+        @test normdate(Date("2021-04-15"), pd) == 1.0f0
+        @test normdate(Date("2021-03-15"), pd) ≈  0.50793654f0
+        @test normdate(Date("2021-01-01"), pd) ≈ -0.6507937f0
+    end
     @testset "aggregate" begin
         AdmissionsSimulation.addprogram("OldA")
         AdmissionsSimulation.addprogram("OldB")
