@@ -1,5 +1,8 @@
 # Plotting & web-rendering functions
 
+using Dash
+using DashBootstrapComponents
+
 function recommend(past_applicants, applicants, program_history, args...; σsel=0.2f0, σyield=1.0f0, σr=0.5f0, σt=Inf32)
     fmatch = match_function(past_applicants, program_history; σsel, σyield, σr, σt)
     return recommend(fmatch, past_applicants, applicants, args...; program_history)
@@ -42,7 +45,7 @@ function visualize(nmatric, prog_status, prog_projection, pq, new_offers, progra
     target = compute_target(program_history, season)
     colnames = ["Program", "Target", "Projection", "# accepts", "# declines", "# remaining", "# unoffered", "Priority"]
     prognames = sort(collect(keys(prog_projection)))
-    tbl = html_table([
+    tbl = dbc_table([
         html_thead(html_tr([html_th(col) for col in colnames])),
         html_tbody([
             html_tr([html_td(prog),
@@ -55,7 +58,7 @@ function visualize(nmatric, prog_status, prog_projection, pq, new_offers, progra
                      html_td(get(pq, prog, 0.0)),
                 ]) for prog in prognames
             ]),
-        ])
+        ]; hover=true)
     rows = []
     for (prog, newoff) in new_offers
         isempty(newoff) && continue
@@ -69,14 +72,19 @@ function visualize(nmatric, prog_status, prog_projection, pq, new_offers, progra
         html_tbody(rows),
     ])
 
-    app = dash()
+    app = dash(external_stylesheets=[dbc_themes.BOOTSTRAP])
     app.layout = html_div() do
         [
-            html_h1(string("Admissions report for ", tnow)),
-            html_div(string("Total target: ", target)),
+            html_h1(string("Admissions report for ", tnow), style=Dict("textAlign" => "center")),
+            html_div([
+                "Total target: ",
+                dcc_input(id="total-target", value=string(target), type="number"),
+            ]),
             html_div(string("Total estimate: ", nmatric)),
+            html_br(),
             html_h3("Program status"),
             tbl,
+            html_br(),
             html_h3("Suggested offers"),
             suggested,
         # dcc_graph(

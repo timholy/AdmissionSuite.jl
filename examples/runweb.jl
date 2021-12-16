@@ -18,15 +18,9 @@ function hide_decision!(applicants, program_history, tnow::Date)
     return applicants
 end
 
-include("parsedata.jl")
-current_applicants = filter(applicants) do app
-    app.season == 2021
-end;
-past_applicants = filter(applicants) do app
-    app.season < 2021
-end;
+if !isdefined(@__MODULE__, :cur_applicants)
+    include("prep_web.jl")
+end
 
-tnow = Date("2021-02-28")
-cur_applicants = hide_decision!(copy(current_applicants), program_history, tnow)
 nmatric, prog_status, prog_projections, pq, new_offers = AdmissionsSimulation.recommend(past_applicants, cur_applicants, program_history, tnow)
 AdmissionsSimulation.visualize(nmatric, prog_status, prog_projections, pq, new_offers, program_history, tnow)
