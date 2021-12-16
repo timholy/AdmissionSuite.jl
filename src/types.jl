@@ -140,7 +140,7 @@ struct NormalizedApplicant
     Candidates who were admitted in the first round would have a value of 0 (or near it), whereas candidates who were on the wait list
     and eventually received offers would have a larger value for this parameter.
     """
-    normofferdate::Float32
+    normofferdate::Union{Float32,Missing}
 
     """
     Normalized date at which the applicant replied with a decision. This uses the same scale as `normofferdate`.
@@ -178,14 +178,14 @@ function NormalizedApplicant(; name::AbstractString="",
                                urmdd::Union{Bool,Missing}=missing,
                                foreign::Union{Bool,Missing}=missing,
                                rank::Union{Integer,Missing}=missing,
-                               offerdate::Date,
+                               offerdate::Union{Date,Missing}=missing,
                                decidedate::Union{Date,Missing}=missing,
                                accept::Union{Bool,Missing}=missing,
                                program_history)
     program = validateprogram(program)
     pdata = program_history[ProgramKey(program, season(offerdate))]
     normrank = applicant_score(rank, pdata)
-    toffer = normdate(offerdate, pdata)
+    toffer = ismissing(offerdate) ? missing : normdate(offerdate, pdata)
     tdecide = ismissing(decidedate) ? missing : normdate(decidedate, pdata)
     accept = ismissing(accept) ? missing : accept
     return NormalizedApplicant(PersonalData(name; urmdd, foreign), program, season(offerdate), normrank, toffer, tdecide, accept)

@@ -176,6 +176,14 @@ function render_program_zoom(fmatch, past_applicants, applicants, tnow::Date, pd
         like = match_likelihood(fmatch, past_applicants, applicant, ntnow)
         return matriculation_probability(like, past_applicants)
     end
+    ntnow = normdate(tnow, pd)
+    function pending_row(app)
+        name = app.applicantdata.name
+        if app.normofferdate !== missing && app.normofferdate <= ntnow
+            name = html_b(name)
+        end
+        return [html_td(name), html_td(calc_pmatric(app))]
+    end
     accepted, declined, undecided = eltype(applicants)[], eltype(applicants)[], eltype(applicants)[]
     for app in applicants
         if app.accept === true
@@ -197,7 +205,7 @@ function render_program_zoom(fmatch, past_applicants, applicants, tnow::Date, pd
             html_h2("Pending:"),
             html_table([
                 html_thead(html_tr([html_th(col) for col in ("Candidate", "Probability")])),
-                html_tbody([html_tr([html_td(app.applicantdata.name), html_td(calc_pmatric(app))]) for app in undecided]),
+                html_tbody([html_tr(pending_row(app)) for app in undecided]),
             ]),
         ])
     )
