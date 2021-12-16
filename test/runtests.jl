@@ -380,11 +380,12 @@ end
         @test all(list -> length(list) == 6, values(program_offers))
         @test all(list -> length(list) == 1, values(program_candidates))
         # By 1/16, many decisions would have been rendered. CB got all 3, NS got 2.
-        add_offers!(fmatch, program_offers, program_candidates, past_applicants, Date("2021-01-16"), 0.25; program_history)
+        nmatric, pq = add_offers!(fmatch, program_offers, program_candidates, past_applicants, Date("2021-01-16"), 0.25; program_history)
         @test length(program_offers["NS"]) == 7
         @test length(program_offers["CB"]) == 6
         @test length(program_candidates["NS"]) == 0
         @test length(program_candidates["CB"]) == 1
+        @test pq["NS"] > pq["CB"]
         # Using random applicants. This is useful for setting the initial number of accepts.
         # The following test assumes σt = Inf (as it is above)
         fake_candidates1 = generate_fake_candidates(program_history, 2021)

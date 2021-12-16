@@ -138,6 +138,7 @@ function add_offers!(fmatch::Function,
         like = match_likelihood(fmatch, past_applicants, applicant, ntnow)
         return matriculation_probability(like, past_applicants)
     end
+    pq = PriorityQueue{String,Float32}(Base.Order.Reverse)
     # Compute the total target
     season = year(tnow)
     target = compute_target(program_history, season)
@@ -152,15 +153,15 @@ function add_offers!(fmatch::Function,
     end
     nmatrics = run_simulation(allpmatrics, 1000)
     nmatric = mean(nmatrics) ± std(nmatrics)
-    nmatric.val + σthresh * nmatric.err > target && return nmatric
+    nmatric.val + σthresh * nmatric.err > target && return nmatric, pq
     # Iteratively add candidates by program-priority
-    pq = PriorityQueue{String,Float32}(Base.Order.Reverse)
     for (program, pmatrics) in ppmatrics
         pd = program_history[ProgramKey(program, season)]
         tgt = pd.target_corrected
         tgt == 0 && continue
         pq[program] = priority(sum(pmatrics), tgt)
     end
+    pq0 = copy(pq)
     while true
         program, p = dequeue_pair!(pq)
         p < zero(p) && continue
@@ -178,7 +179,7 @@ function add_offers!(fmatch::Function,
         nmatrics = run_simulation(allpmatrics, 1000)
         mean(nmatrics) + σthresh * std(nmatrics) > target && break
     end
-    return nmatric
+    return nmatric, pq0
 end
 
 """
