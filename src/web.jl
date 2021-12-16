@@ -8,9 +8,9 @@ function recommend(past_applicants, applicants, program_history, args...; σsel=
     return recommend(fmatch, past_applicants, applicants, args...; program_history)
 end
 
-function recommend(fmatch::Function, past_applicants, applicants, tnow::Date=today(), args...; program_history)
+function recommend(fmatch::Function, past_applicants, applicants, target, tnow::Date=today(), args...; program_history)
     progs = unique(app.program for app in applicants)
-    nmatric, prog_projection = wait_list_analysis(fmatch, past_applicants, applicants, tnow; program_history)
+    _, prog_projection = wait_list_analysis(fmatch, past_applicants, applicants, tnow; program_history)
     # Divide the applicants into those with offers and those not yet offered a slot
     program_offers = Dict(program => NormalizedApplicant[] for program in progs)
     program_candidates = Dict(program => NormalizedApplicant[] for program in progs)
@@ -33,11 +33,11 @@ function recommend(fmatch::Function, past_applicants, applicants, tnow::Date=tod
     #     println(prog, ": ", length(program_offers[prog]), " offers and ", length(program_candidates[prog]), " remaining")
     # end
     # Keep track of the number who already have offers
-    prog_status = Dict(prog => (length(offers), sum(Outcome, offers; init=Outcome()), length(program_candidates[prog])) for (prog, offers) in program_offers)
+    prog_status = Dict(prog => (noffers=length(offers), outcomes=sum(Outcome, offers; init=Outcome()), nwaiting=length(program_candidates[prog])) for (prog, offers) in program_offers)
     # Extend offers, if desired
-    _, pq = add_offers!(fmatch, program_offers, program_candidates, past_applicants, tnow, args...; program_history)
+    nmatricpair, (pq, _) = add_offers!(fmatch, program_offers, program_candidates, past_applicants, tnow, args...; target, program_history)
     new_offers = Dict(prog => program_offers[prog][prog_status[prog][1]+1:end] for prog in progs)
-    return nmatric, prog_status, prog_projection, pq, new_offers
+    return nmatricpair, prog_status, prog_projection, pq, new_offers
 end
 
 function visualize(fetch_past_applicants::Function, fetch_applicants::Function, fetch_program_data::Function, tnow::Union{Date,Function}=today(), args...;
@@ -50,12 +50,15 @@ function visualize(fetch_past_applicants::Function, fetch_applicants::Function, 
     yielddat = yielddata(Tuple{Outcome,Outcome,Outcome}, past_applicants)
     progsim = cached_similarity(σsel, σyield; offerdata=offerdat, yielddata=yielddat)
     fmatch = match_function(; σr, σt, progsim)
+    _season = season(get_tnow(tnow))
 
-    applicants = fetch_applicants()
+    applicants = Ref(fetch_applicants())
+    target = compute_target(program_history, _season)
+
     # progs = sort(unique(app.program for app in applicants))
 
-    target_input = dcc_input(id="total-target", value=string(compute_target(program_history, season(get_tnow(tnow)))), type="number")
-    refresh_btn = dbc_button("Refresh", color = "primary", class_name = "me-1")
+    target_input = dcc_input(id="total-target", value=compute_target(program_history, season(get_tnow(tnow))), type="number")
+    refresh_btn = dbc_button("Refresh applicants", id="refresh-button", n_clicks=0, color="primary", class_name="me-1")
 
     tabs = html_div([
         dbc_tabs(
@@ -68,14 +71,26 @@ function visualize(fetch_past_applicants::Function, fetch_applicants::Function, 
             active_tab = "tab-summary",
         ),
         html_div(id = "content"),
+        html_div(id = "hidden-div", style=Dict("display" => "none")),
     ])
 
     app = dash(external_stylesheets=[dbc_themes.BOOTSTRAP])
 
+    app.layout = html_div() do
+        [html_div([html_div([dbc_label("Total target: "),
+                             target_input,
+                            ]),
+                   refresh_btn,
+                  ], className = "d-grid gap-2 d-md-flex justify-content-md-end"),
+         tabs,
+        ]
+    end
+
     # Tab-switcher callback
-    callback!(app, Output("content", "children"), Input("tabs", "active_tab")) do active_tab
+    callback!(app, Output("content", "children"), Input("tabs", "active_tab"), Input("total-target", "value"), Input("refresh-button", "n_clicks")) do active_tab, tgt, _
         if active_tab == "tab-summary"
-            return render_tab_summary(fmatch, past_applicants, applicants, get_tnow(tnow), program_history, target_input, refresh_btn)
+            target = tgt
+            return render_tab_summary(fmatch, past_applicants, applicants[], get_tnow(tnow), program_history, target)
         elseif active_tab == "tab-program"
             return render_program_zoom()
         elseif active_tab == "tab-internals"
@@ -85,20 +100,21 @@ function visualize(fetch_past_applicants::Function, fetch_applicants::Function, 
         end
     end
 
-    app.layout = html_div() do
-        [tabs,
-        ]
+    # Refresh callback
+    callback!(app, Output("hidden-div", "children"), Input("refresh-button", "n_clicks")) do n
+        applicants[] = fetch_applicants()
+        return nothing
     end
 
     run_server(app, "0.0.0.0", debug=true)
 end
 
-function render_tab_summary(fmatch, past_applicants, applicants, tnow::Date, program_history, target_input, refresh_btn)
-    nmatric, prog_status, prog_projections, pq, new_offers = recommend(fmatch, past_applicants, applicants, tnow; program_history)
+function render_tab_summary(fmatch, past_applicants, applicants, tnow::Date, program_history, target)
+    (nmatric0, nmatric), prog_status, prog_projections, pq, new_offers = recommend(fmatch, past_applicants, applicants, target, tnow; program_history)
     _season = season(tnow)
 
     # The program-status table
-    colnames = ["Program", "Target", "Projection", "# accepts", "# declines", "# remaining", "# unoffered", "Priority"]
+    colnames = ["Program", "Target", "Projection", "# accepts", "# declines", "# pending", "# unoffered", "Priority"]
     prognames = sort(collect(keys(prog_projections)))
     status_tbl = dbc_table([
         html_thead(html_tr([html_th(col) for col in colnames])),
@@ -133,17 +149,14 @@ function render_tab_summary(fmatch, past_applicants, applicants, tnow::Date, pro
     return dbc_card(
         dbc_cardbody([
             html_h1(string("Admissions report for ", tnow), style=Dict("textAlign" => "center")),
-            html_div([
-                "Total target: ",
-                target_input,
-            ]),
-            html_div(string("Total estimate: ", nmatric)),
-            refresh_btn,
+            html_div(string("Total target: ", target)),
+            html_div(string("Total estimate: ", nmatric0)),
             html_br(),
             html_h3("Program status"),
             status_tbl,
             html_br(),
             html_h3("Suggested offers"),
+            html_div(string("Bringing total estimate to ", nmatric)),
             suggested_tbl,
         ]),
         className = "mt-3",
