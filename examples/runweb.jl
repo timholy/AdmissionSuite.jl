@@ -22,5 +22,8 @@ if !isdefined(@__MODULE__, :cur_applicants)
     include("prep_web.jl")
 end
 
-nmatric, prog_status, prog_projections, pq, new_offers = AdmissionsSimulation.recommend(past_applicants, cur_applicants, program_history, tnow)
-AdmissionsSimulation.visualize(nmatric, prog_status, prog_projections, pq, new_offers, program_history, tnow)
+fetch_past_applicants() = past_applicants
+fetch_applicants() = cur_applicants
+fetch_program_data() = program_history
+
+AdmissionsSimulation.visualize(fetch_past_applicants, fetch_applicants, fetch_program_data, tnow)

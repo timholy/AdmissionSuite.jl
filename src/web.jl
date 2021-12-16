@@ -40,25 +40,82 @@ function recommend(fmatch::Function, past_applicants, applicants, tnow::Date=tod
     return nmatric, prog_status, prog_projection, pq, new_offers
 end
 
-function visualize(nmatric, prog_status, prog_projection, pq, new_offers, program_history, tnow::Date=today())
-    season = year(tnow)
-    target = compute_target(program_history, season)
+function visualize(fetch_past_applicants::Function, fetch_applicants::Function, fetch_program_data::Function, tnow::Union{Date,Function}=today(), args...;
+                   σsel=0.2f0, σyield=1.0f0, σr=0.5f0, σt=Inf32)
+    get_tnow(tnow) = isa(tnow, Date) ? tnow : tnow()
+
+    past_applicants = fetch_past_applicants()
+    program_history = fetch_program_data()
+    offerdat = offerdata(past_applicants, program_history)
+    yielddat = yielddata(Tuple{Outcome,Outcome,Outcome}, past_applicants)
+    progsim = cached_similarity(σsel, σyield; offerdata=offerdat, yielddata=yielddat)
+    fmatch = match_function(; σr, σt, progsim)
+
+    applicants = fetch_applicants()
+    # progs = sort(unique(app.program for app in applicants))
+
+    target_input = dcc_input(id="total-target", value=string(compute_target(program_history, season(get_tnow(tnow)))), type="number")
+    refresh_btn = dbc_button("Refresh", color = "primary", class_name = "me-1")
+
+    tabs = html_div([
+        dbc_tabs(
+            [
+                dbc_tab(label = "Summary",   tab_id = "tab-summary"),
+                dbc_tab(label = "Program",   tab_id = "tab-program"),
+                dbc_tab(label = "Internals", tab_id = "tab-internals"),
+            ],
+            id = "tabs",
+            active_tab = "tab-summary",
+        ),
+        html_div(id = "content"),
+    ])
+
+    app = dash(external_stylesheets=[dbc_themes.BOOTSTRAP])
+
+    # Tab-switcher callback
+    callback!(app, Output("content", "children"), Input("tabs", "active_tab")) do active_tab
+        if active_tab == "tab-summary"
+            return render_tab_summary(fmatch, past_applicants, applicants, get_tnow(tnow), program_history, target_input, refresh_btn)
+        elseif active_tab == "tab-program"
+            return render_program_zoom()
+        elseif active_tab == "tab-internals"
+            return render_internals()
+        else
+            return html_p("This shouldn't ever be displayed...")
+        end
+    end
+
+    app.layout = html_div() do
+        [tabs,
+        ]
+    end
+
+    run_server(app, "0.0.0.0", debug=true)
+end
+
+function render_tab_summary(fmatch, past_applicants, applicants, tnow::Date, program_history, target_input, refresh_btn)
+    nmatric, prog_status, prog_projections, pq, new_offers = recommend(fmatch, past_applicants, applicants, tnow; program_history)
+    _season = season(tnow)
+
+    # The program-status table
     colnames = ["Program", "Target", "Projection", "# accepts", "# declines", "# remaining", "# unoffered", "Priority"]
-    prognames = sort(collect(keys(prog_projection)))
-    tbl = dbc_table([
+    prognames = sort(collect(keys(prog_projections)))
+    status_tbl = dbc_table([
         html_thead(html_tr([html_th(col) for col in colnames])),
         html_tbody([
             html_tr([html_td(prog),
-                     html_td(program_history[ProgramKey(prog, season)].target_corrected),
-                     html_td(string(prog_projection[prog].nmatriculants)),
-                     html_td(prog_status[prog][2].naccepts),
-                     html_td(prog_status[prog][2].ndeclines),
-                     html_td(prog_status[prog][1] - total(prog_status[prog][2])),
-                     html_td(prog_status[prog][3]),
-                     html_td(get(pq, prog, 0.0)),
+                    html_td(program_history[ProgramKey(prog, _season)].target_corrected),
+                    html_td(string(prog_projections[prog].nmatriculants)),
+                    html_td(prog_status[prog][2].naccepts),
+                    html_td(prog_status[prog][2].ndeclines),
+                    html_td(prog_status[prog][1] - total(prog_status[prog][2])),
+                    html_td(prog_status[prog][3]),
+                    html_td(get(pq, prog, 0.0)),
                 ]) for prog in prognames
             ]),
         ]; hover=true)
+
+    # The suggested-offers table
     rows = []
     for (prog, newoff) in new_offers
         isempty(newoff) && continue
@@ -67,38 +124,32 @@ function visualize(nmatric, prog_status, prog_projection, pq, new_offers, progra
             push!(rows, html_tr([html_td(""), html_td(off.applicantdata.name)]))
         end
     end
-    suggested = html_table([
+    suggested_tbl = html_table([
         html_thead(html_tr([html_th(col) for col in ("Program", "Candidate")])),
         html_tbody(rows),
     ])
 
-    app = dash(external_stylesheets=[dbc_themes.BOOTSTRAP])
-    app.layout = html_div() do
-        [
+    # The overall layout
+    return dbc_card(
+        dbc_cardbody([
             html_h1(string("Admissions report for ", tnow), style=Dict("textAlign" => "center")),
             html_div([
                 "Total target: ",
-                dcc_input(id="total-target", value=string(target), type="number"),
+                target_input,
             ]),
             html_div(string("Total estimate: ", nmatric)),
+            refresh_btn,
             html_br(),
             html_h3("Program status"),
-            tbl,
+            status_tbl,
             html_br(),
             html_h3("Suggested offers"),
-            suggested,
-        # dcc_graph(
-        #     id = "example-graph-1",
-        #     figure = (
-        #         data = [
-        #             (x = ["giraffes", "orangutans", "monkeys"], y = [20, 14, 23], type = "bar", name = "SF"),
-        #             (x = ["giraffes", "orangutans", "monkeys"], y = [12, 18, 29], type = "bar", name = "Montreal"),
-        #         ],
-        #         layout = (title = "Dash Data Visualization", barmode="group")
-        #     )
-        # )
-        ]
-    end
-
-    run_server(app, "0.0.0.0", debug=true)
+            suggested_tbl,
+        ]),
+        className = "mt-3",
+    )
 end
+
+render_program_zoom() = html_p("Program zoom")
+
+render_internals() = html_p("Internals")
