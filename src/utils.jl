@@ -226,7 +226,7 @@ julia> noffers = sort([prog => length(list) for (prog, list) in program_offers];
 ```
 """
 function generate_fake_candidates(program_history::ListPairs{ProgramKey,ProgramData}, season::Integer,
-                                  program_offer_dates=nothing; decided::Union{Bool,AbstractFloat}=false)
+                                  program_offer_dates=nothing; decided::Union{Bool,AbstractFloat}=false, tnow::Date=today())
     randchoice(ds) = isa(ds, Date) ? ds : rand(ds)::Date
 
     program_candidates = Dict{String,Vector{NormalizedApplicant}}()
@@ -239,11 +239,14 @@ function generate_fake_candidates(program_history::ListPairs{ProgramKey,ProgramD
                 accept = rand() < decided ? rand(Bool) : missing
             end
             offerdate = program_offer_dates === nothing ? pd.firstofferdate : randchoice(get(program_offer_dates, pk.program, pd.firstofferdate))
+            if offerdate > tnow
+                accept = missing
+            end
             NormalizedApplicant(; name=randstring(8)*" "*randstring(6),
                                   program=pk.program, rank=r,
                                   offerdate,
                                   accept,
-                                  decidedate=isa(accept, Bool) ? rand(offerdate:Day(1):pd.lastdecisiondate) : missing,
+                                  decidedate=isa(accept, Bool) ? rand(offerdate:Day(1):min(pd.lastdecisiondate, tnow)) : missing,
                                   program_history)
         end
     end

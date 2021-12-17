@@ -13,7 +13,7 @@ Create a report about the current state of admissions. The report has 3 tabs:
 - "Program" provides a detailed view of a single program selected in the dropdown at the top right, showing candidates who have accepted or rejected
   the offer of admission, along with a predicted matriculation probability for each undecided applicant.
 - "Internals" provides information about the model details, currently just the "Program similarity" score which expresses the
-  the use of cross-program data in predicting matriculation probability.
+  use of cross-program data in predicting matriculation probability.
 
 The "Refresh applicants" button fetches fresh data about the current applicants, and should be used to update projections as decisions
 get made.

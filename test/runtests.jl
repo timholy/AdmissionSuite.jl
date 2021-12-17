@@ -491,14 +491,14 @@ end
             end
         end
         yr = last(yrs)
+        fixeddate = Date("$(yr)-02-28")
         program_offer_dates = Dict(prog => Date("$yr-02-01"):Day(1):Date("$yr-04-15") for prog in progs)
-        fk = AdmissionsSimulation.generate_fake_candidates(program_history, yr, decided=0.3, program_offer_dates)
+        fk = AdmissionsSimulation.generate_fake_candidates(program_history, yr, decided=0.3, program_offer_dates, tnow=fixeddate)
         applicants = NormalizedApplicant[]
         for prog in progs
             append!(applicants, fk[prog])
         end
 
-        fixeddate = Date("$(yr)-02-28")
         app = manage_offers(()->past_applicants, ()->applicants, ()->program_history, ()->fixeddate)
         @test isa(app, AdmissionsSimulation.Dash.DashApp)
         app = manage_offers(()->past_applicants, ()->applicants, ()->program_history, fixeddate)
