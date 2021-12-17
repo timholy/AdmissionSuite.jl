@@ -12,6 +12,13 @@ function countby(list)
 end
 
 @testset "AdmissionsSimulation.jl" begin
+    @testset "normdate" begin
+        pd = ProgramData(firstofferdate=Date("2021-02-11"), lastdecisiondate=Date("2021-04-15"))
+        @test normdate(Date("2021-02-11"), pd) == 0.0f0
+        @test normdate(Date("2021-04-15"), pd) == 1.0f0
+        @test normdate(Date("2021-03-15"), pd) ≈  0.50793654f0
+        @test normdate(Date("2021-01-01"), pd) ≈ -0.6507937f0
+    end
     @testset "aggregate" begin
         AdmissionsSimulation.addprogram("OldA")
         AdmissionsSimulation.addprogram("OldB")
@@ -196,6 +203,7 @@ end
         program_history = Dict(ProgramKey("NS", 2021) => ProgramData(slots=15, napplicants=302, firstofferdate=Date("2021-01-13"), lastdecisiondate=Date("2021-04-15")),
                                ProgramKey("CB", 2021) => ProgramData(slots=5,  napplicants=160, firstofferdate=Date("2021-01-6"),  lastdecisiondate=Date("2021-04-15")),
         )
+        @test AdmissionsSimulation.compute_target(program_history, Date("2021-04-15")) == 20
         past_applicants = [(program="NS", rank=7, offerdate=Date("2021-01-13"), decidedate=Date("2021-03-26"), accept=true),
                            (program="NS", rank=3, offerdate=Date("2021-01-13"), decidedate=Date("2021-04-15"), accept=false),
                            (program="CB", rank=6, offerdate=Date("2021-03-25"), decidedate=Date("2021-04-15"), accept=true),
@@ -372,11 +380,12 @@ end
         @test all(list -> length(list) == 6, values(program_offers))
         @test all(list -> length(list) == 1, values(program_candidates))
         # By 1/16, many decisions would have been rendered. CB got all 3, NS got 2.
-        add_offers!(fmatch, program_offers, program_candidates, past_applicants, Date("2021-01-16"), 0.25; program_history)
+        (nmatric, _), (_, pq) = add_offers!(fmatch, program_offers, program_candidates, past_applicants, Date("2021-01-16"), 0.25; program_history)
         @test length(program_offers["NS"]) == 7
         @test length(program_offers["CB"]) == 6
         @test length(program_candidates["NS"]) == 0
         @test length(program_candidates["CB"]) == 1
+        @test pq["NS"] > pq["CB"]
         # Using random applicants. This is useful for setting the initial number of accepts.
         # The following test assumes σt = Inf (as it is above)
         fake_candidates1 = generate_fake_candidates(program_history, 2021)
@@ -399,6 +408,10 @@ end
         @test progstatus["CB"].poutcome == 1
         @test progstatus["NS"].poutcome == 0
         # Just make sure this runs
+        nmatric, progstatus = wait_list_analysis(fmatch, past_applicants, test_applicants, Date("2021-01-13"); program_history)
+        @test nmatric ≈ 6
+        # Also with unknown decision dates
+        test_applicants = [NormalizedApplicant(app; normdecidedate=missing) for app in test_applicants]
         nmatric, progstatus = wait_list_analysis(fmatch, past_applicants, test_applicants, Date("2021-01-13"); program_history)
         @test nmatric ≈ 6
     end
@@ -458,5 +471,49 @@ end
         for prog in newprogs
             AdmissionsSimulation.delprogram(prog)
         end
+    end
+
+    @testset "Web" begin
+        # We don't test that it renders, but we do check all the callbacks
+        progs = ["BBSB","BIDS","CB","CSB","DRSCB","EEPB","HSG","IMM","MCB","MGG","MMMP","NS","PMB"]
+        yrs = 2017:2022
+        program_history = Dict{ProgramKey,ProgramData}()
+        for yr in yrs, prog in progs
+            slots=rand(4:13)
+            program_history[ProgramKey(prog, yr)] = ProgramData(; slots, napplicants=2*slots, firstofferdate=Date("$yr-02-01"), lastdecisiondate=Date("$yr-04-15"))
+        end
+        target = AdmissionsSimulation.compute_target(program_history, last(yrs))
+        past_applicants = NormalizedApplicant[]
+        for yr in first(yrs):last(yrs)-1
+            fk = AdmissionsSimulation.generate_fake_candidates(program_history, yr; decided=true)
+            for prog in progs
+                append!(past_applicants, fk[prog])
+            end
+        end
+        yr = last(yrs)
+        fixeddate = Date("$(yr)-02-28")
+        program_offer_dates = Dict(prog => Date("$yr-02-01"):Day(1):Date("$yr-04-15") for prog in progs)
+        fk = AdmissionsSimulation.generate_fake_candidates(program_history, yr, decided=0.3, program_offer_dates, tnow=fixeddate)
+        applicants = NormalizedApplicant[]
+        for prog in progs
+            append!(applicants, fk[prog])
+        end
+
+        app = manage_offers(()->past_applicants, ()->applicants, ()->program_history, ()->fixeddate)
+        @test isa(app, AdmissionsSimulation.Dash.DashApp)
+        app = manage_offers(()->past_applicants, ()->applicants, ()->program_history, fixeddate)
+        @test isa(app, AdmissionsSimulation.Dash.DashApp)
+        app = manage_offers(()->past_applicants, ()->applicants, ()->program_history, fixeddate, 1.5)
+        @test isa(app, AdmissionsSimulation.Dash.DashApp)
+        fmatch = match_function()
+        tab = AdmissionsSimulation.render_tab_summary(fmatch,
+            past_applicants, applicants, fixeddate, program_history, target)
+        @test isa(tab, AdmissionsSimulation.DashBase.Component)
+        prog = "MMMP"
+        tab = AdmissionsSimulation.render_program_zoom(fmatch, past_applicants,
+            filter(app->app.program==prog, applicants), fixeddate, program_history[ProgramKey(prog,last(yrs))])
+        @test isa(tab, AdmissionsSimulation.DashBase.Component)
+        tab = AdmissionsSimulation.render_internals(AdmissionsSimulation.default_similarity, progs)
+        @test isa(tab, AdmissionsSimulation.DashBase.Component)
     end
 end

@@ -20,6 +20,7 @@ appfile = "AcceptOffered_Hold_Outcome_w_Dates.csv"
 df = DataFrame(CSV.File(appfile))
 
 function parserow(row, program_history; warn::Bool=false)
+    name = row."Applicant"
     p = row."Program"
     ishold = !ismissing(row."Interviewed, Hold") || !ismissing(row."Interviewed, High Hold")
     da = row."Acceptance Offered"
@@ -41,7 +42,7 @@ function parserow(row, program_history; warn::Bool=false)
                 ddecide = hasproperty(pd, :lastdecisiondate) ? pd.lastdecisiondate : missing
             end
         end
-        return p, dadmit, ddecide, accept, ishold
+        return name, p, dadmit, ddecide, accept, ishold
     end
     return ishold
 end
@@ -62,7 +63,7 @@ for g in gdf
             nhold += 1
             continue
         end
-        _, thisdadmit, thisddecide, accept, ishold = ret
+        _, _, thisdadmit, thisddecide, accept, ishold = ret
         dadmit = min(dadmit, thisdadmit)
         if !ismissing(thisddecide)
             ddecide = max(ddecide, thisddecide)
@@ -84,12 +85,12 @@ applicants = NormalizedApplicant[]
 for row in eachrow(df)
     ret = parserow(row, program_history; warn=true)
     isa(ret, Bool) && continue
-    progname, dadmit, ddecide, accept, ishold = ret
+    name, progname, dadmit, ddecide, accept, ishold = ret
     key = ProgramKey(progname, dadmit)
     po = program_offers[key]
     # rank = ishold ? po[1] : 1
     # push!(applicants, NormalizedApplicant(; program=progname, rank, offerdate=dadmit, decidedate=ddecide, accept=accept, program_history))
-    push!(applicants, NormalizedApplicant(; program=progname, offerdate=dadmit, decidedate=ddecide, accept=accept, program_history))
+    push!(applicants, NormalizedApplicant(; name=name, program=progname, offerdate=dadmit, decidedate=ddecide, accept=accept, program_history))
 end
 
 # Parse faculty data

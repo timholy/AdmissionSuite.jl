@@ -14,3 +14,6 @@ This package has two main components:
 - tools to strategize extension of initial offers and wait-list offers ("how should we achieve it?")
 
 Each main thread is described on a separate page.
+
+This package also provides a browser-based application that can be used by admissions professionals to manage the
+admissions season.
