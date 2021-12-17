@@ -26,4 +26,5 @@ fetch_past_applicants() = past_applicants
 fetch_applicants() = cur_applicants
 fetch_program_data() = program_history
 
-AdmissionsSimulation.visualize(fetch_past_applicants, fetch_applicants, fetch_program_data, tnow)
+app = manage_offers(fetch_past_applicants, fetch_applicants, fetch_program_data, tnow)
+AdmissionsSimulation.run_server(app, "0.0.0.0", debug=true)

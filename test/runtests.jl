@@ -472,4 +472,48 @@ end
             AdmissionsSimulation.delprogram(prog)
         end
     end
+
+    @testset "Web" begin
+        # We don't test that it renders, but we do check all the callbacks
+        progs = ["BBSB","BIDS","CB","CSB","DRSCB","EEPB","HSG","IMM","MCB","MGG","MMMP","NS","PMB"]
+        yrs = 2017:2022
+        program_history = Dict{ProgramKey,ProgramData}()
+        for yr in yrs, prog in progs
+            slots=rand(4:13)
+            program_history[ProgramKey(prog, yr)] = ProgramData(; slots, napplicants=2*slots, firstofferdate=Date("$yr-02-01"), lastdecisiondate=Date("$yr-04-15"))
+        end
+        target = AdmissionsSimulation.compute_target(program_history, last(yrs))
+        past_applicants = NormalizedApplicant[]
+        for yr in first(yrs):last(yrs)-1
+            fk = AdmissionsSimulation.generate_fake_candidates(program_history, yr; decided=true)
+            for prog in progs
+                append!(past_applicants, fk[prog])
+            end
+        end
+        yr = last(yrs)
+        program_offer_dates = Dict(prog => Date("$yr-02-01"):Day(1):Date("$yr-04-15") for prog in progs)
+        fk = AdmissionsSimulation.generate_fake_candidates(program_history, yr, decided=0.3, program_offer_dates)
+        applicants = NormalizedApplicant[]
+        for prog in progs
+            append!(applicants, fk[prog])
+        end
+
+        fixeddate = Date("$(yr)-02-28")
+        app = manage_offers(()->past_applicants, ()->applicants, ()->program_history, ()->fixeddate)
+        @test isa(app, AdmissionsSimulation.Dash.DashApp)
+        app = manage_offers(()->past_applicants, ()->applicants, ()->program_history, fixeddate)
+        @test isa(app, AdmissionsSimulation.Dash.DashApp)
+        app = manage_offers(()->past_applicants, ()->applicants, ()->program_history, fixeddate, 1.5)
+        @test isa(app, AdmissionsSimulation.Dash.DashApp)
+        fmatch = match_function()
+        tab = AdmissionsSimulation.render_tab_summary(fmatch,
+            past_applicants, applicants, fixeddate, program_history, target)
+        @test isa(tab, AdmissionsSimulation.DashBase.Component)
+        prog = "MMMP"
+        tab = AdmissionsSimulation.render_program_zoom(fmatch, past_applicants,
+            filter(app->app.program==prog, applicants), fixeddate, program_history[ProgramKey(prog,last(yrs))])
+        @test isa(tab, AdmissionsSimulation.DashBase.Component)
+        tab = AdmissionsSimulation.render_internals(AdmissionsSimulation.default_similarity, progs)
+        @test isa(tab, AdmissionsSimulation.DashBase.Component)
+    end
 end

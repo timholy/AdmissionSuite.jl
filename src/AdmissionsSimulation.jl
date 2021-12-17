@@ -6,6 +6,7 @@ using DocStringExtensions
 using CSV
 using Measurements
 using Statistics
+using Random
 using DataStructures
 using NLsolve
 using ProgressMeter
@@ -22,6 +23,8 @@ export match_likelihood, match_function, matriculation_probability, run_simulati
 export normdate, aggregate, generate_fake_candidates
 # I/O
 export read_program_history, read_applicant_data, read_faculty_data
+# Browser
+export manage_offers
 
 include("types.jl")
 include("utils.jl")
