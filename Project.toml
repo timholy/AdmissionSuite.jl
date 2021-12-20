@@ -1,35 +1,10 @@
-name = "AdmissionsSimulation"
-uuid = "e9cde6de-6074-429b-acec-d279973730fc"
+name = "AdmissionSuite"
+uuid = "8b45ef46-624e-11ec-1cdc-2faba70bd3ce"
 authors = ["Tim Holy <tim.holy@gmail.com> and contributors"]
-version = "0.1.0"
+version = "0.2.0"
 
 [deps]
+AdmissionTargets = "9b29e739-6137-49c0-ab44-b63304efda64"
+Admit = "e9cde6de-6074-429b-acec-d279973730fc"
+AdmitConfiguration = "19a2e0a6-566e-4c00-8888-a0edb19dbca0"
 CSV = "336ed68f-0bac-5ca0-87d4-7b16caf5d00b"
-Dash = "1b08a953-4be3-4667-9a23-3db579824955"
-DashBootstrapComponents = "1b08a953-4be3-4667-9a23-fa6d05876a1e"
-DataStructures = "864edb3b-99cc-5e75-8d2d-829cb0a9cfe8"
-Dates = "ade2ca70-3891-5945-98fb-dc099432e06a"
-Distributions = "31c24e10-a181-5473-b8eb-7969acd0382f"
-DocStringExtensions = "ffbed154-4ef7-542d-bbb7-c09d3a79fcae"
-Measurements = "eff96d63-e80a-5855-80a2-b1b0885c5ab7"
-NLsolve = "2774e3e8-f4cf-5e23-947b-6d7e65073b56"
-ProgressMeter = "92933f4c-e287-5a05-a399-4b506db050ca"
-Random = "9a3f8284-a2c9-5f02-9a11-845980a1fd5c"
-Statistics = "10745b16-79ce-11e8-11f9-7d13ad32a3b2"
-
-[compat]
-CSV = "0.8, 0.9.3"
-Dash = "1.1"
-DataStructures = "0.18"
-Distributions = "0.25"
-DocStringExtensions = "0.8"
-Measurements = "2"
-NLsolve = "4"
-ProgressMeter = "1"
-julia = "1.4"
-
-[extras]
-Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
-
-[targets]
-test = ["Test"]

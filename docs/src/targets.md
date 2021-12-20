@@ -15,7 +15,7 @@ Among the choices below, the recommended algorithm is called `NormEffort`.
 Faculty records are stored in the following format:
 
 ```jldoctest targets
-julia> using AdmissionsSimulation, Dates
+julia> using AdmissionTargets, Dates
 
 julia> facrecs = [
            "Last1, First1" => FacultyRecord(Date("2011-10-01"), ["BBSB", "CSB"], ["BBSB" => Service(11, 3), "MMMP" => Service(1, 0)]),
@@ -50,7 +50,7 @@ Dict{String, Float32} with 3 entries:
 With `:normalized`, a faculty member with `n` affiliations contributes `1/n` to each.
 Other options include `:all` and `:weighted`.
 
-The recommended default is `:primary` because this is the only choice which yields consistent answers under program mergers and splits.
+Among affiliation-based measures, the recommended default is `:primary` because this is the only choice which yields consistent answers under program mergers and splits.
 
 ## Effort-based measures
 
@@ -107,4 +107,24 @@ Dict{String, Float32} with 4 entries:
   "MMMP" => 1.22386
 ```
 
-The first argument is the number of applicants per program.  In this simple example, `f` was computed from `faculty_involvement` and no faculty in our example list provided service to "CSB", so that program was awarded no slots.  Under more realistic circumstances with hundreds of faculty engaged in many different ways, the slot computation reflects the aggregate affiliations or involvement across programs.
+The first argument is the number of applicants per program, the second the "number" of faculty per program, and the third the total number of slots available.  In this simple example, `f` was computed from `faculty_involvement` and no faculty in our example list provided service to "CSB", so that program was awarded no slots.  Under more realistic circumstances with hundreds of faculty engaged in many different ways, the slot computation reflects the aggregate affiliations or involvement across programs.
+
+You can also impose a minimum number of slots per program:
+
+```jldoctest targets
+julia> tgts, parameters = targets(Dict("BBSB" => 86, "CSB" => 90, "EEPB" => 47, "MMMP" => 139), Dict(zip(programs, f)), 12, 2);
+┌ Warning: The following programs 'earned' less than one slot (give them notice): ["CSB", "MMMP"]
+└ @ AdmissionTargets ~/.julia/dev/AdmissionSuite/AdmissionTargets/src/targets.jl:261
+
+julia> tgts
+Dict{String, Float64} with 4 entries:
+  "EEPB" => 3.51217
+  "CSB"  => 2.0
+  "BBSB" => 4.34612
+  "MMMP" => 2.14171
+
+julia> parameters
+(n0 = 2.0, N′ = 7.511807630635848)
+```
+
+The floor is imposed without going over the total of 12 slots, and so while it boosts the smallest programs it takes slots away from the larger ones. By default, a warning is issued for any program that "earns" less than a single slot, but this can be suppressed by adding `iswarn=false` to the call to `targets`. `params` describes the parameters used in the overall model, which is described in [`targets(program_napplicants, program_nfaculty, N, minslots)`](@ref).
