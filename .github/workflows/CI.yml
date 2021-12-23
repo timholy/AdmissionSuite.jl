@@ -38,6 +38,8 @@ jobs:
             ${{ runner.os }}-
       - uses: julia-actions/julia-buildpkg@v1
       - run: |
+          julia --project -e 'using Pkg; Pkg.develop("Preferences")'  # https://github.com/JuliaPackaging/Preferences.jl/issues/25
+          julia --project=AdmitConfiguration -e 'using Pkg; Pkg.develop("Preferences")'  # https://github.com/JuliaPackaging/Preferences.jl/issues/25
           julia --project -e 'using Pkg; Pkg.add("CSV"); using AdmitConfiguration, CSV; setprograms(joinpath(pkgdir(AdmitConfiguration), "examples", "WashU.csv"))'
           cat LocalPreferences.toml
           julia --project -e 'using Pkg; Pkg.test("AdmitConfiguration"; coverage=true)'
