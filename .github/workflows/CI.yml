@@ -45,7 +45,7 @@ jobs:
           julia --project -e 'using Pkg; Pkg.test("AdmissionTargets"; coverage=true)'
       - uses: julia-actions/julia-processcoverage@v1
         with:
-          directories: AdmitConfiguration/src, Admit/src, AdmissionTargets/src
+          directories: AdmitConfiguration/src,Admit/src,AdmissionTargets/src
       - uses: codecov/codecov-action@v1
         with:
           file: lcov.info
