@@ -145,7 +145,7 @@ version = "1.4.0"
 
 [[Preferences]]
 deps = ["TOML"]
-path = "/home/tim/.julia/dev/Preferences"
+git-tree-sha1 = "00cfd92944ca9c760982747e9a1d0d5d86ab1e5a"
 uuid = "21216c6a-2e73-6563-6e65-726566657250"
 version = "1.2.2"
 

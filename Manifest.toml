@@ -4,19 +4,19 @@
 deps = ["AdmitConfiguration", "CSV", "Dates", "DocStringExtensions", "NLsolve"]
 path = "AdmissionTargets"
 uuid = "9b29e739-6137-49c0-ab44-b63304efda64"
-version = "0.1.0"
+version = "0.2.0"
 
 [[Admit]]
-deps = ["AdmitConfiguration", "CSV", "Dash", "DashBootstrapComponents", "DataStructures", "Dates", "DocStringExtensions", "Measurements", "NLsolve", "ProgressMeter", "Random", "Statistics"]
+deps = ["AdmitConfiguration", "CSV", "Dash", "DashBootstrapComponents", "DataStructures", "Dates", "DocStringExtensions", "Measurements", "NLsolve", "Preferences", "ProgressMeter", "Random", "Statistics"]
 path = "Admit"
 uuid = "e9cde6de-6074-429b-acec-d279973730fc"
-version = "0.1.0"
+version = "0.2.0"
 
 [[AdmitConfiguration]]
 deps = ["CSV", "Dates", "Missings", "Preferences", "Requires", "UUIDs"]
 path = "AdmitConfiguration"
 uuid = "19a2e0a6-566e-4c00-8888-a0edb19dbca0"
-version = "0.1.0"
+version = "0.2.0"
 
 [[ArgTools]]
 uuid = "0dad84c5-d112-42e6-8d28-ef12dabb789f"
