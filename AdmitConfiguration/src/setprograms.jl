@@ -22,11 +22,17 @@ function setprograms(filename::AbstractString; kwargs...)
     end
     # tomlfile = joinpath(suitedir, "LocalPreferences.toml")
     # set_preferences!(tomlfile, "AdmitConfiguration",
-    set_preferences!(@__MODULE__,
+    # set_preferences!(@__MODULE__,
+    #                  "program_lookups" => program_lookups,
+    #                  "program_abbreviations" => collect(program_abbreviations),
+    #                  "program_range" => Dict(name => Dict("start"=>first(rng), "stop"=>last(rng)) for (name, rng) in program_range),
+    #                  "program_substitutions" => program_substitutions;
+    #                  kwargs...
+    #                  )
+    @set_preferences!(
                      "program_lookups" => program_lookups,
                      "program_abbreviations" => collect(program_abbreviations),
                      "program_range" => Dict(name => Dict("start"=>first(rng), "stop"=>last(rng)) for (name, rng) in program_range),
-                     "program_substitutions" => program_substitutions;
-                     kwargs...
+                     "program_substitutions" => program_substitutions
                      )
 end
