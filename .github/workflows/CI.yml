@@ -37,8 +37,17 @@ jobs:
             ${{ runner.os }}-test-
             ${{ runner.os }}-
       - uses: julia-actions/julia-buildpkg@v1
-      - uses: julia-actions/julia-runtest@v1
+      - run: |
+          julia --project -e 'using Pkg; Pkg.develop("Preferences")'  # https://github.com/JuliaPackaging/Preferences.jl/issues/25
+          julia --project=AdmitConfiguration -e 'using Pkg; Pkg.develop("Preferences")'  # https://github.com/JuliaPackaging/Preferences.jl/issues/25
+          julia --project -e 'using Pkg; Pkg.add("CSV"); using AdmitConfiguration, CSV; setprograms(joinpath(pkgdir(AdmitConfiguration), "examples", "WashU.csv"))'
+          cat LocalPreferences.toml
+          julia --project -e 'using Pkg; Pkg.test("AdmitConfiguration"; coverage=true)'
+          julia --project -e 'using Pkg; Pkg.test("Admit"; coverage=true)'
+          julia --project -e 'using Pkg; Pkg.test("AdmissionTargets"; coverage=true)'
       - uses: julia-actions/julia-processcoverage@v1
+        with:
+          directories: AdmitConfiguration/src,Admit/src,AdmissionTargets/src
       - uses: codecov/codecov-action@v1
         with:
           file: lcov.info

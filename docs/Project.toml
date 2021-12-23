@@ -1,3 +1,8 @@
 [deps]
-AdmissionsSimulation = "e9cde6de-6074-429b-acec-d279973730fc"
+AdmissionTargets = "9b29e739-6137-49c0-ab44-b63304efda64"
+Admit = "e9cde6de-6074-429b-acec-d279973730fc"
+AdmitConfiguration = "19a2e0a6-566e-4c00-8888-a0edb19dbca0"
 Documenter = "e30172f5-a6a5-5a46-863b-614d45cd2de4"
+
+[compat]
+Documenter = "0.27"

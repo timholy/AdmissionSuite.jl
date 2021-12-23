@@ -1,6 +1,6 @@
 # Offer extension and outcome forecasts
 
-This rest of the package focuses on the strategic questions of how many students should get offers of admission and how to manage a wait-list as decisions arrive during the admissions season.
+This page explains the internal workings of the package.
 
 This package uses past applicants as proxies for current applicants to make predictions about whether they'll accept the offer. Because two "similar" students might end up making different final decisions, the recommended practice is to identify many different potential proxies and use the distribution of their decisions to simulate future outcomes.  This is similar to a [k-nearest neighbors](https://en.wikipedia.org/wiki/K-nearest_neighbors_algorithm) algorithm, but with continuous weights applied to each potential neighbor and no limit on the number of neighbors used.
 
@@ -55,7 +55,7 @@ a dictionary recording just a few bits of information for each program. For exam
 ```
 suffices to record aggregate data for two programs, `"NS"` and `"CB"`, during the 2021 season (corresponding to a decision deadline of April 15, 2021). This records the target number of matriculants (`slots`), the total number of applications received, the date of the very first offers extended, and the date on which a decision was due.
 
-Valid choices for program names are listed in `AdmissionsSimulation.program_lookups`; internally the code always uses
+Valid choices for program names are listed in `Admit.program_lookups`; internally the code always uses
 the abbreviation, but it is possible to supply it in long form too.
 
 Detailed applicant records only need to include applicants to whom an offer of admission was extended.

@@ -2,7 +2,7 @@
 
 ## Install Julia
 
-AdmissionsSimulation is written in [Julia](https://julialang.org/), a free, modern, high-performance language that excels for
+Admit is written in [Julia](https://julialang.org/), a free, modern, high-performance language that excels for
 analytics and machine learning. Visit the Downloads page and install either:
 
 - the "LTS" = "Long Term Support" version
@@ -24,7 +24,7 @@ At that point, hit ']' to enter "package mode":
 Then enter the following line:
 
 ```
-add https://github.com/timholy/AdmissionsSimulation.jl.git
+add https://github.com/timholy/AdmissionSuite.jl.git
 ```
 
 You should see something that starts like this:

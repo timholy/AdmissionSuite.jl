@@ -1,0 +1,23 @@
+name = "AdmissionTargets"
+uuid = "9b29e739-6137-49c0-ab44-b63304efda64"
+authors = ["Tim Holy <tim.holy@gmail.com> and contributors"]
+version = "0.2.0"
+
+[deps]
+AdmitConfiguration = "19a2e0a6-566e-4c00-8888-a0edb19dbca0"
+CSV = "336ed68f-0bac-5ca0-87d4-7b16caf5d00b"
+Dates = "ade2ca70-3891-5945-98fb-dc099432e06a"
+DocStringExtensions = "ffbed154-4ef7-542d-bbb7-c09d3a79fcae"
+NLsolve = "2774e3e8-f4cf-5e23-947b-6d7e65073b56"
+
+[compat]
+CSV = "0.9"
+DocStringExtensions = "0.8"
+NLsolve = "4"
+julia = "1"
+
+[extras]
+Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
+
+[targets]
+test = ["Test"]
