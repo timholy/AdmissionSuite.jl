@@ -9,3 +9,6 @@ Admit = "e9cde6de-6074-429b-acec-d279973730fc"
 AdmitConfiguration = "19a2e0a6-566e-4c00-8888-a0edb19dbca0"
 CSV = "336ed68f-0bac-5ca0-87d4-7b16caf5d00b"
 Preferences = "21216c6a-2e73-6563-6e65-726566657250"
+
+[compat]
+Preferences = "1"
