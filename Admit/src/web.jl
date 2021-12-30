@@ -190,7 +190,7 @@ function render_program_zoom(fmatch::Function,
         if app.normofferdate !== missing && app.normofferdate <= ntnow
             name = html_b(name)
         end
-        return [html_td(name), html_td(calc_pmatric(app))]
+        return [html_td(name), html_td(round(calc_pmatric(app); digits=2))]
     end
 
     ntnow = normdate(tnow, pd)
@@ -215,10 +215,10 @@ function render_program_zoom(fmatch::Function,
             html_br(),
             html_h2("Pending:"),
             html_div("Boldface indicates candidates with a pending offer, the rest are wait-listed"),
-            html_table([
-                html_thead(html_tr([html_th(col) for col in ("Candidate", "Probability")])),
+            dbc_table([
+                html_thead(html_tr([html_th("Candidate"; style=Dict("width"=>"80%")), html_th("Probability"; style=Dict("width"=>"20%"))])),
                 html_tbody([html_tr(pending_row(app)) for app in undecided]),
-            ]),
+            ]; hover=true),
         ])
     )
 end
