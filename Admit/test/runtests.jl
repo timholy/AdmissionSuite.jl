@@ -354,7 +354,7 @@ end
         @test isa(tab, Admit.DashBase.Component)
         prog = "MMMP"
         tab = Admit.render_program_zoom(fmatch, past_applicants,
-            filter(app->app.program==prog, applicants), fixeddate, program_history[ProgramKey(prog,last(yrs))])
+            filter(app->app.program==prog, applicants), fixeddate, program_history[ProgramKey(prog,last(yrs))], prog)
         @test isa(tab, Admit.DashBase.Component)
         tab = Admit.render_internals(Admit.default_similarity, progs)
         @test isa(tab, Admit.DashBase.Component)
