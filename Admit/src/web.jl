@@ -209,13 +209,17 @@ function render_program_zoom(fmatch::Function,
     # Data for the response-date
     yes = Float64[]
     no = Float64[]
+    seasonrange = (typemax(Int), typemin(Int))
+    update_range((_min, _max), x) = (min(_min, x), max(_max, x))
     for app in past_applicants
         app.program == prog || continue
         isa(app.normdecidedate, Real) || continue
         if app.accept === true
             push!(yes, app.normdecidedate)
+            seasonrange = update_range(seasonrange, app.season)
         elseif app.accept === false
             push!(no, app.normdecidedate)
+            seasonrange = update_range(seasonrange, app.season)
         end
     end
 
@@ -243,7 +247,7 @@ function render_program_zoom(fmatch::Function,
                         #= FIXME: vertical line does not naturally span the y-domain =#
                         (xref = "x", yref = "y domain", x = [ntnow, ntnow], y = [0.0, 10.0], type = "line", line = (dash = "dash", width = 3), name = "today"),
                     ],
-                    layout = (title = "Decision timing", xaxis = (title = "Normalized date",)),
+                    layout = (title = "Decision timing ($(seasonrange[1])-$(seasonrange[2]))", xaxis = (title = "Normalized date",)),
                 )
             )
         ])
