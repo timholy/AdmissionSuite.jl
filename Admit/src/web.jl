@@ -97,7 +97,7 @@ function manage_offers(fetch_past_applicants::Function, fetch_applicants::Functi
             target = tgt
             return render_tab_summary(fmatch, past_applicants, applicants[], get_tnow(tnow), program_history, target)
         elseif active_tab == "tab-program"
-            return render_program_zoom(fmatch, past_applicants, filter(app->app.program==prog, applicants[]), get_tnow(tnow), program_history[ProgramKey(prog, _season)])
+            return render_program_zoom(fmatch, past_applicants, filter(app->app.program==prog, applicants[]), get_tnow(tnow), program_history[ProgramKey(prog, _season)], prog)
         elseif active_tab == "tab-internals"
             return render_internals(progsim, progs)
         else
@@ -178,9 +178,9 @@ function render_program_zoom(fmatch::Function,
                              past_applicants::AbstractVector{NormalizedApplicant},
                              applicants::AbstractVector{NormalizedApplicant},
                              tnow::Date,
-                             pd::ProgramData)
+                             pd::ProgramData,
+                             prog::AbstractString)
     function calc_pmatric(applicant)  # TODO? copied from add_offers!, would be better not to copy but it's a closure...
-        ntnow = normdate(tnow, pd)
         applicant.normdecidedate !== missing && applicant.normdecidedate <= ntnow && return Float32(applicant.accept)
         like = match_likelihood(fmatch, past_applicants, applicant, ntnow)
         return matriculation_probability(like, past_applicants)
@@ -205,6 +205,24 @@ function render_program_zoom(fmatch::Function,
         end
     end
     sort!(undecided; by=app->app.normrank)
+
+    # Data for the response-date
+    yes = Float64[]
+    no = Float64[]
+    seasonrange = (typemax(Int), typemin(Int))
+    update_range((_min, _max), x) = (min(_min, x), max(_max, x))
+    for app in past_applicants
+        app.program == prog || continue
+        isa(app.normdecidedate, Real) || continue
+        if app.accept === true
+            push!(yes, app.normdecidedate)
+            seasonrange = update_range(seasonrange, app.season)
+        elseif app.accept === false
+            push!(no, app.normdecidedate)
+            seasonrange = update_range(seasonrange, app.season)
+        end
+    end
+
     return dbc_card(
         dbc_cardbody([
             html_h2("Accepted:"),
@@ -219,6 +237,19 @@ function render_program_zoom(fmatch::Function,
                 html_thead(html_tr([html_th("Candidate"; style=Dict("width"=>"80%")), html_th("Probability"; style=Dict("width"=>"20%"))])),
                 html_tbody([html_tr(pending_row(app)) for app in undecided]),
             ]; hover=true),
+            html_br(),
+            dcc_graph(
+                id = "timing",
+                figure = (
+                    data = [
+                        (x = yes, type = "histogram", name = "accept"),
+                        (x = no,  type = "histogram", name = "decline"),
+                        #= FIXME: vertical line does not naturally span the y-domain =#
+                        (xref = "x", yref = "y domain", x = [ntnow, ntnow], y = [0.0, 10.0], type = "line", line = (dash = "dash", width = 3), name = "today"),
+                    ],
+                    layout = (title = "Decision timing ($(seasonrange[1])-$(seasonrange[2]))", xaxis = (title = "Normalized date",)),
+                )
+            )
         ])
     )
 end
@@ -235,7 +266,7 @@ function render_internals(progsim::Function, progs::AbstractVector{<:AbstractStr
                      ],
                      layout = (title = "Program similarity", yaxis = (scaleanchor = "x",)),
                 ),
-            )
+            ),
         ]),
         style = Dict("width" => 500),
     )
