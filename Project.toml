@@ -8,6 +8,9 @@ AdmissionTargets = "9b29e739-6137-49c0-ab44-b63304efda64"
 Admit = "e9cde6de-6074-429b-acec-d279973730fc"
 AdmitConfiguration = "19a2e0a6-566e-4c00-8888-a0edb19dbca0"
 CSV = "336ed68f-0bac-5ca0-87d4-7b16caf5d00b"
+MariaDB_Connector_C_jll = "aabc7e14-95f1-5e66-9f32-aea603782360"
+MariaDB_Connector_ODBC_jll = "1124d457-72a3-5205-9757-36a127c7d0f8"
+ODBC = "be6f12e9-ca4f-5eb2-a339-a4f995cc0291"
 
 [compat]
 CSV = "0.9, 0.10"

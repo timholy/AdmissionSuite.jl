@@ -6,7 +6,7 @@ uuid = "a4c015fc-c6ff-483c-b24f-f7ea428134e9"
 version = "0.0.1"
 
 [[AdmissionTargets]]
-deps = ["AdmitConfiguration", "CSV", "Dates", "DocStringExtensions", "NLsolve"]
+deps = ["AdmitConfiguration", "CSV", "Dates", "DocStringExtensions", "NLsolve", "ODBC"]
 path = "../AdmissionTargets"
 uuid = "9b29e739-6137-49c0-ab44-b63304efda64"
 version = "0.2.0"
@@ -18,7 +18,7 @@ uuid = "e9cde6de-6074-429b-acec-d279973730fc"
 version = "0.2.0"
 
 [[AdmitConfiguration]]
-deps = ["CSV", "Dates", "Missings", "Preferences", "Requires", "UUIDs"]
+deps = ["CSV", "Dates", "Missings", "ODBC", "Preferences", "Requires", "UUIDs"]
 path = "../AdmitConfiguration"
 uuid = "19a2e0a6-566e-4c00-8888-a0edb19dbca0"
 version = "0.2.0"
@@ -102,6 +102,11 @@ version = "3.41.0"
 deps = ["Artifacts", "Libdl"]
 uuid = "e66e0078-7015-5450-92f7-15fbd957f2ae"
 
+[[DBInterface]]
+git-tree-sha1 = "9b0dc525a052b9269ccc5f7f04d5b3639c65bca5"
+uuid = "a10d1c49-ce27-4219-8d33-6db1a4562965"
+version = "2.5.0"
+
 [[Dash]]
 deps = ["Base64", "CodecZlib", "DashBase", "DashCoreComponents", "DashHtmlComponents", "DashTable", "DataStructures", "HTTP", "JSON", "JSON3", "MD5", "Pkg", "PlotlyBase", "Sockets", "Test", "UUIDs", "YAML"]
 git-tree-sha1 = "b17cbf74dec4dbc56eef19358bb3546a48a55ceb"
@@ -154,6 +159,18 @@ version = "1.0.0"
 [[Dates]]
 deps = ["Printf"]
 uuid = "ade2ca70-3891-5945-98fb-dc099432e06a"
+
+[[DecFP]]
+deps = ["DecFP_jll", "Printf", "Random", "SpecialFunctions"]
+git-tree-sha1 = "a836d5799ae9772d74861755d95df306a3056cac"
+uuid = "55939f99-70c6-5e9b-8bb0-5071ed7d61fd"
+version = "1.2.0"
+
+[[DecFP_jll]]
+deps = ["Artifacts", "JLLWrappers", "Libdl", "Pkg"]
+git-tree-sha1 = "9982cddeac476ed4ead831baff7b3f9d084579c1"
+uuid = "47200ebd-12ce-5be5-abb7-8e082af23329"
+version = "2.0.3+0"
 
 [[DelimitedFiles]]
 deps = ["Mmap"]
@@ -411,6 +428,12 @@ version = "0.3.6"
 [[NetworkOptions]]
 uuid = "ca575930-c2e3-43a9-ace4-1e988b2c1908"
 
+[[ODBC]]
+deps = ["DBInterface", "Dates", "DecFP", "Libdl", "Printf", "Random", "Tables", "UUIDs", "Unicode", "iODBC_jll", "unixODBC_jll"]
+git-tree-sha1 = "7e3ce82387793ee6e787f9dbf78728602f97c7ad"
+uuid = "be6f12e9-ca4f-5eb2-a339-a4f995cc0291"
+version = "1.0.4"
+
 [[OpenLibm_jll]]
 deps = ["Artifacts", "Libdl"]
 uuid = "05823500-19ac-5b8b-9628-191a04bc5112"
@@ -619,6 +642,12 @@ version = "0.4.7"
 deps = ["Libdl"]
 uuid = "83775a58-1f1d-513f-b197-d71354ab007a"
 
+[[iODBC_jll]]
+deps = ["Libdl", "Pkg"]
+git-tree-sha1 = "275437992b9d383ec34e0712ff70f0cc2bff2669"
+uuid = "80337aba-e645-5151-a517-44b13a626b79"
+version = "3.52.13+1"
+
 [[nghttp2_jll]]
 deps = ["Artifacts", "Libdl"]
 uuid = "8e850ede-7688-5339-a07c-302acd2aaf8d"
@@ -626,3 +655,9 @@ uuid = "8e850ede-7688-5339-a07c-302acd2aaf8d"
 [[p7zip_jll]]
 deps = ["Artifacts", "Libdl"]
 uuid = "3f19e933-33d8-53b3-aaab-bd5110c3b7a0"
+
+[[unixODBC_jll]]
+deps = ["Libdl", "Libiconv_jll", "Pkg"]
+git-tree-sha1 = "7240ac85d0e65d0a6a45d19404472f8b4665e551"
+uuid = "1841a5aa-d9e2-579c-8226-32ed2af93ab1"
+version = "2.3.7+0"

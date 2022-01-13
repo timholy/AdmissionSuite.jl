@@ -3,6 +3,7 @@ module AdmitConfiguration
 using Dates
 using UUIDs
 using Missings
+using ODBC
 using Preferences
 using Requires
 
@@ -11,11 +12,15 @@ export program_lookups, program_abbreviations, program_range, program_substituti
 # functions
 export addprogram, delprogram, validateprogram, setprograms
 export substitute, merge_program_range!
+# SQL
+export setdsn, connectdsn
 
 const program_lookups = Dict{String,String}()
 const program_abbreviations = Set{String}()
 const program_range = Dict{String,UnitRange{Int}}()
 const program_substitutions = Dict{String,Vector{String}}()
+const sql_dsn = Ref{String}()
+# const sql_connect = Ref{String}()
 
 """
     addprogram(abbrv::AbstractString)
@@ -105,6 +110,28 @@ function merge_program_range!(progrange, subs)
     return progrange
 end
 
+"""
+    setdsn(name)
+
+Configure a Data Source `name` for a SQL database
+"""
+function setdsn(name::AbstractString)
+    @set_preferences!("sql_dsn" => name)
+end
+
+"""
+    setconnect(str)
+
+Configure SQL database access via a "connect" string `str`.
+
+!!! warning
+    Omit your UID (user name) and PWD (password) from `str`, otherwise it gets stored in plain-text and is a security risk.
+"""
+function setconnect(str::AbstractString)
+    @set_preferences!("sql_connect" => str)
+end
+
+include("sql.jl")
 
 function __init__()
     @require CSV = "336ed68f-0bac-5ca0-87d4-7b16caf5d00b" include("setprograms.jl")
@@ -117,6 +144,7 @@ function loadprefs()
     if !onloadpath
         push!(LOAD_PATH, suitedir)
     end
+
     plook = @load_preference("program_lookups")
     plook !== nothing && merge!(program_lookups, plook)
     pabv = @load_preference("program_abbreviations")
@@ -129,6 +157,11 @@ function loadprefs()
     end
     psubs = @load_preference("program_substitutions")
     psubs !== nothing && merge!(program_substitutions, psubs)
+    pdsn = @load_preference("sql_dsn")
+    pdsn !== nothing && (sql_dsn[] = pdsn)
+    # pconnect = @load_preference("sql_connect")
+    # pconnect !== nothing && sql_connect[] = pconnect
+
     if !onloadpath
         pop!(LOAD_PATH)
     end
