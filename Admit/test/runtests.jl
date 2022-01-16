@@ -219,7 +219,7 @@ end
             # # Add one more applicant
             # prog => push!(list, NormalizedApplicant(; program=prog, rank=7, offerdate=Date("2021-01-13"), decidedate=Date("2021-01-20"), accept=true, program_history))
         end)
-        program_offers = initial_offers!(fmatch, program_candidates, past_applicants, Date("2021-01-01"), 0.25; program_history)
+        program_offers, _ = initial_offers!(fmatch, program_candidates, past_applicants, Date("2021-01-01"), 0.25; program_history)
         @test all(list -> length(list) == 6, values(program_offers))
         @test all(list -> length(list) == 1, values(program_candidates))
         # By 1/16, many decisions would have been rendered. CB got all 3, NS got 2.
@@ -232,11 +232,21 @@ end
         # Using random applicants. This is useful for setting the initial number of accepts.
         # The following test assumes σt = Inf (as it is above)
         fake_candidates1 = generate_fake_candidates(program_history, 2021)
-        fake_offers1 = initial_offers!(fmatch, fake_candidates1, past_applicants, Date("2021-01-01"); program_history)
+        fake_offers1, _ = initial_offers!(fmatch, fake_candidates1, past_applicants, Date("2021-01-01"); program_history)
         fake_candidates2 = generate_fake_candidates(program_history, 2021, Dict("CB" => Date.(["2021-01-13", "2021-02-02"])))
-        fake_offers2 = initial_offers!(fmatch, fake_candidates2, past_applicants, Date("2021-01-01"); program_history)
+        fake_offers2, _ = initial_offers!(fmatch, fake_candidates2, past_applicants, Date("2021-01-01"); program_history)
         dictcount(d) = Dict(key=>length(val) for (key,val) in d)
         @test dictcount(fake_offers1) == dictcount(fake_offers2)
+
+        # Check that we can use -σthresh to generate the number of candidates for the wait list
+        fake_candidates3 = generate_fake_candidates(program_history, 2021, Dict("CB" => Date.(["2021-01-13", "2021-02-02"])))
+        fake_offers3a, nmatrica = initial_offers!(fmatch, deepcopy(fake_candidates3), past_applicants, Date("2021-01-01"),  2; program_history)
+        fake_offers3b, nmatricb = initial_offers!(fmatch, deepcopy(fake_candidates3), past_applicants, Date("2021-01-01"), -2; program_history)
+        target = Admit.compute_target(program_history, 2021);
+        @test nmatrica.val +   nmatrica.err < target
+        @test nmatrica.val + 2*nmatrica.err >= target
+        @test nmatricb.val - 2*nmatricb.err >= target
+        @test nmatricb.val - 3*nmatricb.err < target
 
         ## Analyzing wait list
         applicants = vec([NormalizedApplicant(; program=prog, rank=r, offerdate=Date("$yr-01-13"), decidedate=r>3 ? Date("$yr-01-15") : Date("$yr-04-15"), accept=r>3+(prog=="NS")-(yr==2019), program_history) for prog in ("CB", "NS"), r in 1:6, yr in 2019:2021])
@@ -300,7 +310,7 @@ end
             # ProgA puts more low-probability applicants high on their list
             prog_candidates = Dict("ProgA" => vec([(urm = (r + yr) % 3 == 0; NormalizedApplicant(; program="ProgA", urmdd=urm,   rank=r, offerdate=Date("$yr-01-01"), program_history)) for r in 1:30]),
                                    "ProgB" => vec([                          NormalizedApplicant(; program="ProgB", urmdd=false, rank=r, offerdate=Date("$yr-01-01"), program_history)  for r in 1:30]))
-            offers = initial_offers!(fmatch_creator(σr, σurm), prog_candidates, past_applicants, Date("2021-01-01"); program_history)
+            offers, _ = initial_offers!(fmatch_creator(σr, σurm), prog_candidates, past_applicants, Date("2021-01-01"); program_history)
             nA += length(offers["ProgA"])
             nB += length(offers["ProgB"])
         end
@@ -346,11 +356,11 @@ end
         @test isa(app, Admit.Dash.DashApp)
         app = manage_offers(()->past_applicants, ()->applicants, ()->program_history, fixeddate)
         @test isa(app, Admit.Dash.DashApp)
-        app = manage_offers(()->past_applicants, ()->applicants, ()->program_history, fixeddate, 1.5)
+        app = manage_offers(()->past_applicants, ()->applicants, ()->program_history, fixeddate; σthresh=1.5)
         @test isa(app, Admit.Dash.DashApp)
         fmatch = match_function()
         tab = Admit.render_tab_summary(fmatch,
-            past_applicants, applicants, fixeddate, program_history, target)
+            past_applicants, applicants, fixeddate, program_history, target, 2)
         @test isa(tab, Admit.DashBase.Component)
         prog = "MMMP"
         tab = Admit.render_program_zoom(fmatch, past_applicants,

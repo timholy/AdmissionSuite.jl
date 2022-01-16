@@ -1,7 +1,7 @@
 name = "Admit"
 uuid = "e9cde6de-6074-429b-acec-d279973730fc"
 authors = ["Tim Holy <tim.holy@gmail.com> and contributors"]
-version = "0.2.0"
+version = "0.3.0"
 
 [deps]
 AdmitConfiguration = "19a2e0a6-566e-4c00-8888-a0edb19dbca0"

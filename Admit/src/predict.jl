@@ -85,7 +85,7 @@ function wait_list_analysis(fmatch::Function,
         progname = progkey.program
         ntnow = isa(tnow, Date) ? normdate(tnow, progdata) : tnow
         # Select applicants to this program who already have an offer
-        papplicants = filter(app -> app.program == progname && (app.normofferdate < ntnow || iszero(app.normofferdate)), applicants)
+        papplicants = filter(app -> app.program == progname && app.normofferdate <= ntnow, applicants)
         ppmatrics = map(papplicants) do applicant
             if !ismissing(applicant.normdecidedate)
                 applicant.normdecidedate <= ntnow && return Float32(applicant.accept)
@@ -99,7 +99,7 @@ function wait_list_analysis(fmatch::Function,
         progtarget = progdata.target_corrected
         poutcome = missing
         if actual_yield !== nothing
-            wlapplicants = filter(app -> app.program == progname && (app.normofferdate >= ntnow && !iszero(app.normofferdate)), applicants)
+            wlapplicants = filter(app -> app.program == progname && app.normofferdate > ntnow, applicants)
             for applicant in wlapplicants
                 like = match_likelihood(fmatch, past_applicants, applicant, ntnow)
                 push!(ppmatrics, matriculation_probability(like, past_applicants))
@@ -170,7 +170,7 @@ function add_offers!(fmatch::Function,
     pq0 = copy(pq)
     while !isempty(pq)
         program, p = dequeue_pair!(pq)
-        p < zero(p) && continue
+        # p < zero(p) && continue
         candidates = program_candidates[program]
         isempty(candidates) && continue
         applicant = popfirst!(candidates)
@@ -190,7 +190,7 @@ function add_offers!(fmatch::Function,
 end
 
 """
-    program_offers = initial_offers!(fmatch, program_candidates::Dict, past_applicants, tnow::Date=today(), σthresh=2; program_history)
+    program_offers, nmatric = initial_offers!(fmatch, program_candidates::Dict, past_applicants, tnow::Date=today(), σthresh=2; program_history)
 
 Allocate initial offers of admission at the beginning of the season.  See [`add_offers!`](@ref) for more information.
 See also [`generate_fake_candidates`](@ref) to plan offers in cases where some programs want to make their initial offers
@@ -198,8 +198,8 @@ before other programs have finished interviewing.
 """
 function initial_offers!(fmatch::Function, program_candidates::Dict, args...; kwargs...)
     program_offers = Dict(program => NormalizedApplicant[] for program in keys(program_candidates))
-    add_offers!(fmatch, program_offers, program_candidates, args...; kwargs...)
-    return program_offers
+    nmatricpr, pqpair = add_offers!(fmatch, program_offers, program_candidates, args...; kwargs...)
+    return program_offers, nmatricpr.second
 end
 
 ## Model training

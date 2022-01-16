@@ -1,7 +1,7 @@
 name = "AdmissionSuite"
 uuid = "8b45ef46-624e-11ec-1cdc-2faba70bd3ce"
 authors = ["Tim Holy <tim.holy@gmail.com> and contributors"]
-version = "0.2.0"
+version = "0.3.0"
 
 [deps]
 AdmissionTargets = "9b29e739-6137-49c0-ab44-b63304efda64"

@@ -4,7 +4,7 @@
 deps = ["AdmitConfiguration", "CSV", "Dash", "DashBootstrapComponents", "DataStructures", "Dates", "DocStringExtensions", "Measurements", "NLsolve", "ProgressMeter", "Random", "Statistics"]
 path = ".."
 uuid = "e9cde6de-6074-429b-acec-d279973730fc"
-version = "0.2.0"
+version = "0.3.0"
 
 [[AdmitConfiguration]]
 deps = ["CSV", "Dates", "Missings", "Preferences", "Requires", "UUIDs"]
