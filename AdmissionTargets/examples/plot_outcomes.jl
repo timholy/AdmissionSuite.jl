@@ -99,3 +99,19 @@ if isdefined(@__MODULE__, :dfvotes)
     fig.tight_layout()
     fig.savefig("votes_per_program.pdf")
 end
+
+# Affiliation pairings
+if isdefined(@__MODULE__, :normpairings)
+    fig, ax = plt.subplots()
+    img = ax.imshow(normpairings)
+    ax.set_xlabel("Secondary/tertiary program")
+    ax.set_xticks(0:length(pnames)-1)
+    ax.set_xticklabels(pnames; rotation="vertical")
+    ax.set_ylabel("Primary/secondary program")
+    ax.set_yticks(0:length(pnames)-1)
+    ax.set_yticklabels(pnames)
+    ax.set_title("Affiliation pairs")
+    fig.colorbar(img)
+    fig.tight_layout()
+    fig.savefig("affiliation_pairs.pdf")
+end
