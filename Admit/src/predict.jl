@@ -202,6 +202,15 @@ function initial_offers!(fmatch::Function, program_candidates::Dict, args...; kw
     return program_offers, nmatricpr.second
 end
 
+function build_program_candidates(applicants)
+    progs = unique(app.program for app in applicants)
+    program_candidates = Dict(program => NormalizedApplicant[] for program in progs)
+    for app in applicants
+        push!(program_candidates[app.program], app)
+    end
+    return program_candidates
+end
+
 ## Model training
 
 function collect_predictions!(fmatch::Function, pmatrics::AbstractVector, accepts::AbstractVector{Bool};

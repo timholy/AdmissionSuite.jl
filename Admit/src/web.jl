@@ -4,7 +4,7 @@ using Dash
 using DashBootstrapComponents
 
 """
-    app = manage_offers(fetch_past_applicants::Function, fetch_applicants::Function, fetch_program_data::Function, tnow::Union{Date,Function}=today, σthresh::Real=2;
+    app = manage_offers(fetch_past_applicants::Function, fetch_applicants::Function, fetch_program_data::Function, tnow::Union{Date,Function}=today; σthresh::Real=2;
                         σsel=0.2f0, σyield=1.0f0, σr=0.5f0, σt=Inf32)
 
 Create a report about the current state of admissions. The report has 3 tabs:
@@ -39,8 +39,8 @@ To render the report in a browser, use
 Admit.run_server(app, "0.0.0.0", debug=true)
 ```
 """
-function manage_offers(fetch_past_applicants::Function, fetch_applicants::Function, fetch_program_data::Function, tnow::Union{Date,Function}=today(), args...;
-                       σsel=0.2f0, σyield=1.0f0, σr=0.5f0, σt=Inf32)
+function manage_offers(fetch_past_applicants::Function, fetch_applicants::Function, fetch_program_data::Function, tnow::Union{Date,Function}=today();
+                       σthresh=2, σsel=0.2f0, σyield=1.0f0, σr=0.5f0, σt=Inf32)
     get_tnow(tnow) = isa(tnow, Date) ? tnow : tnow()
 
     past_applicants = fetch_past_applicants()
@@ -69,6 +69,7 @@ function manage_offers(fetch_past_applicants::Function, fetch_applicants::Functi
             [
                 dbc_tab(label = "Summary",   tab_id = "tab-summary"),
                 dbc_tab(label = "Program",   tab_id = "tab-program"),
+                dbc_tab(label = "Initial",   tab_id = "tab-initial"),
                 dbc_tab(label = "Internals", tab_id = "tab-internals"),
             ],
             id = "tabs",
@@ -95,9 +96,11 @@ function manage_offers(fetch_past_applicants::Function, fetch_applicants::Functi
     callback!(app, Output("content", "children"), Input("tabs", "active_tab"), Input("total-target", "value"), Input("program-selector", "value"), Input("refresh-button", "n_clicks")) do active_tab, tgt, prog, _
         if active_tab == "tab-summary"
             target = tgt
-            return render_tab_summary(fmatch, past_applicants, applicants[], get_tnow(tnow), program_history, target)
+            return render_tab_summary(fmatch, past_applicants, applicants[], get_tnow(tnow), program_history, target, σthresh)
         elseif active_tab == "tab-program"
             return render_program_zoom(fmatch, past_applicants, filter(app->app.program==prog, applicants[]), get_tnow(tnow), program_history[ProgramKey(prog, _season)], prog)
+        elseif active_tab == "tab-initial"
+            return render_tab_initial(fmatch, past_applicants, applicants[], Date(_season), program_history, target, σthresh)
         elseif active_tab == "tab-internals"
             return render_internals(progsim, progs)
         else
@@ -120,8 +123,8 @@ function render_tab_summary(fmatch::Function,
                             tnow::Date,
                             program_history,
                             target::Real,
-                            args...)
-    (nmatric0, nmatric), prog_status, prog_projections, pq, new_offers = recommend(fmatch, past_applicants, applicants, target, tnow, args...; program_history)
+                            σthresh::Real)
+    (nmatric0, nmatric), prog_status, prog_projections, pq, new_offers = recommend(fmatch, past_applicants, applicants, target, tnow, σthresh; program_history)
     _season = season(tnow)
 
     # The program-status table
@@ -236,7 +239,7 @@ function render_program_zoom(fmatch::Function,
             dbc_table([
                 html_thead(html_tr([html_th("Candidate"; style=Dict("width"=>"80%")), html_th("Probability"; style=Dict("width"=>"20%"))])),
                 html_tbody([html_tr(pending_row(app)) for app in undecided]),
-            ]; hover=true),
+            ]; hover=true, style=Dict("width"=>"auto")),
             html_br(),
             dcc_graph(
                 id = "timing",
@@ -254,6 +257,52 @@ function render_program_zoom(fmatch::Function,
     )
 end
 
+function render_tab_initial(fmatch::Function,
+                            past_applicants::AbstractVector{NormalizedApplicant},
+                            applicants::AbstractVector{NormalizedApplicant},
+                            startdate::Date,
+                            program_history,
+                            target::Real,
+                            σthresh::Real)
+    init_offers_by_prog, nmatrici = initial_offers!(fmatch, build_program_candidates(applicants), past_applicants, startdate,  σthresh; program_history)
+    wl_by_prog, npool             = initial_offers!(fmatch, build_program_candidates(applicants), past_applicants, startdate, -σthresh; program_history)
+    noffers = Dict(prog => length(list) for (prog, list) in init_offers_by_prog)
+    nwl     = Dict(prog => length(list) for (prog, list) in wl_by_prog)
+    _season = season(startdate)
+
+    colnames = ["Program", "Target", "# potential offers", "# initial offers"]
+    prognames = sort(collect(keys(init_offers_by_prog)))
+    tbl = dbc_table([
+        html_thead(html_tr([html_th(col) for col in colnames])),
+        html_tbody(vcat([
+            html_tr([html_td(prog),
+                     html_td(program_history[ProgramKey(prog, _season)].target_corrected),
+                     html_td(nwl[prog]),
+                     html_td(noffers[prog]),
+                ]) for prog in prognames
+            ],
+            html_tr([
+                html_td("Total"),
+                html_td(target),
+                html_td(string(npool)),
+                html_td(string(nmatrici))
+                ]))),
+        ]; hover=true, style=Dict("width"=>"auto"))
+
+    # The overall layout
+    return dbc_card(
+        dbc_cardbody([
+            html_h1(string("Season start (", startdate, ")"), style=Dict("textAlign" => "center")),
+            tbl,
+            html_p("# potential offers = suggested number of candidates you should have in the initial pool (offers + wait list)"),
+            html_p("# initial offers = suggested number of candidates who receive an offer of admission at the beginning of the season"),
+            html_br(),
+            html_p("Based on buffer of $σthresh times the standard deviation"),
+        ]),
+        className = "mt-3",
+    )
+end
+
 function render_internals(progsim::Function, progs::AbstractVector{<:AbstractString})
     psim = [[progsim(px, py) for px in progs] for py in progs]
     return dbc_card(
@@ -262,7 +311,7 @@ function render_internals(progsim::Function, progs::AbstractVector{<:AbstractStr
                 id = "progsim",
                 figure = (
                     data = [
-                        (x = progs, y = progs, z = psim, type = "heatmap", transpose = "true"),
+                        (x = progs, y = progs, z = psim, type = "heatmap", zmin = 0, zmax = 1, transpose = "true"),
                      ],
                      layout = (title = "Program similarity", yaxis = (scaleanchor = "x",)),
                 ),
@@ -277,7 +326,7 @@ function recommend(fmatch::Function,
                    applicants::AbstractVector{NormalizedApplicant},
                    target::Real,
                    tnow::Date,
-                   args...;   # σthresh, passed to add_offers!
+                   σthresh::Real;
                    program_history)
     progs = unique(app.program for app in applicants)
     _, prog_projection = wait_list_analysis(fmatch, past_applicants, applicants, tnow; program_history)
@@ -305,7 +354,7 @@ function recommend(fmatch::Function,
     # Keep track of the number who already have offers
     prog_status = Dict(prog => (noffers=length(offers), outcomes=sum(Outcome, offers; init=Outcome()), nwaiting=length(program_candidates[prog])) for (prog, offers) in program_offers)
     # Extend offers, if desired
-    nmatricpair, (pq, _) = add_offers!(fmatch, program_offers, program_candidates, past_applicants, tnow, args...; target, program_history)
+    nmatricpair, (pq, _) = add_offers!(fmatch, program_offers, program_candidates, past_applicants, tnow, σthresh; target, program_history)
     new_offers = Dict(prog => program_offers[prog][prog_status[prog][1]+1:end] for prog in progs)
     return nmatricpair, prog_status, prog_projection, pq, new_offers
 end
