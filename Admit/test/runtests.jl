@@ -382,7 +382,7 @@ end
         tab = Admit.render_tab_initial(fmatch,
             past_applicants, applicants, fixeddate, program_history, target, 2)
         @test isa(tab, Admit.DashBase.Component)
-        tab = Admit.render_internals(Admit.default_similarity, progs)
+        tab = Admit.render_internals(fmatch, past_applicants, applicants, fixeddate, program_history, Admit.default_similarity, progs)
         @test isa(tab, Admit.DashBase.Component)
     end
 end
