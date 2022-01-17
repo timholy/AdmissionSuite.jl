@@ -102,7 +102,7 @@ function manage_offers(fetch_past_applicants::Function, fetch_applicants::Functi
         elseif active_tab == "tab-initial"
             return render_tab_initial(fmatch, past_applicants, applicants[], Date(_season), program_history, target, σthresh)
         elseif active_tab == "tab-internals"
-            return render_internals(progsim, progs)
+            return render_internals(fmatch, past_applicants, applicants[], get_tnow(tnow), program_history, progsim, progs)
         else
             return html_p("An unexpected tab error occurred, please report how to trigger this error")
         end
@@ -303,8 +303,36 @@ function render_tab_initial(fmatch::Function,
     )
 end
 
-function render_internals(progsim::Function, progs::AbstractVector{<:AbstractString})
+function render_internals(fmatch::Function,
+                          past_applicants::AbstractVector{NormalizedApplicant},
+                          applicants::AbstractVector{NormalizedApplicant},
+                          tnow::Date,
+                          program_history,
+                          progsim::Function,
+                          progs::AbstractVector{<:AbstractString})
+    _season = season(tnow)
     psim = [[progsim(px, py) for px in progs] for py in progs]
+    nmatches = Dict{String,Measurement{Float64}}()
+    for prog in progs
+        nsim = Float64[]
+        ntnow = normdate(tnow, program_history[ProgramKey(program=prog, season=_season)])
+        for app in applicants
+            app.program == prog && (ismissing(app.normdecidedate) || app.normdecidedate > ntnow) || continue
+            push!(nsim, sum(pastapp->fmatch(app, pastapp, ntnow), past_applicants))
+        end
+        nmatches[prog] = round(mean(nsim); digits=1) ± round(std(nsim); digits=1)
+    end
+    colnames = ["Program", "# of matches/applicant"]
+    tbl = dbc_table([
+        html_thead(html_tr([html_th(col) for col in colnames])),
+        html_tbody([
+            html_tr([html_td(prog),
+                     html_td(string(nmatches[prog])),
+                ]) for prog in sort(progs)
+            ]),
+        ]; hover=true, style=Dict("width"=>"auto"))
+
+
     return dbc_card(
         dbc_cardbody([
             dcc_graph(
@@ -316,6 +344,8 @@ function render_internals(progsim::Function, progs::AbstractVector{<:AbstractStr
                      layout = (title = "Program similarity", yaxis = (scaleanchor = "x",)),
                 ),
             ),
+            html_br(),
+            tbl,
         ]),
         style = Dict("width" => 500),
     )

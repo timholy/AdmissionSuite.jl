@@ -152,6 +152,10 @@ end
         # Test lower-level call (for a single year) with rank determining acceptance
         past_applicants = vec([NormalizedApplicant(; program=prog, rank=r, offerdate=od, decidedate=dd, accept=r>3, program_history) for prog in ("CB", "NS"), r in 1:6, (od,dd) in zip(offerdates[begin:end-1], decidedates[begin:end-1])])
         applicants      = vec([NormalizedApplicant(; program=prog, rank=r, offerdate=offerdates[end], decidedate=decidedates[end], accept=r>3, program_history) for prog in ("CB", "NS"), r in 1:6])
+        # Just the program yield
+        yes = yield_errors(σsels, σyields; applicants=vcat(applicants, past_applicants), program_history)
+        @test yes == [0 0; 0 0]
+        # Each applicant
         od = offerdata(past_applicants, program_history)
         yd = yielddata(Tuple{Outcome,Outcome,Outcome}, past_applicants)
         @test match_correlation(0.2, Inf, Inf, Inf; applicants, past_applicants, offerdata=od, yielddata=yd) == 0
@@ -180,6 +184,10 @@ end
         # Case 3: program yield timing and rank are meaningful, nothing else is
         progmonth = Dict("CB" => 3, "NS" => 4)
         applicants = vec([NormalizedApplicant(; program=prog, rank=r, offerdate=od, decidedate=dd, accept=r>=progmonth[prog] && month(dd)==progmonth[prog], program_history) for prog in ("CB", "NS"), r in 1:6, od in offerdates, dd in decidedates if year(od) == year(dd)])
+        yes = yield_errors(σsels, σyields; applicants, program_history)
+        @test yes[1,1] ≈ yes[2,1]
+        @test yes[1,2] == yes[2,2] == 0
+        @test yes[1,1] > 0
         corarray = match_correlation(σsels, σyields, σrs, σts; applicants, program_history, minfrac=0)
         @test corarray[1,:,:,:] ≈ corarray[2,:,:,:]
         @test corarray[:,:,:,1] ≈ corarray[:,:,:,2]
@@ -200,6 +208,11 @@ end
         @test !(corarray[:,:,1,:] ≈ corarray[:,:,2,:])
         idx = argmax(substnan(corarray))
         @test idx[1] == idx[3] == 2
+        # Case 5: yield with selectivity and yield
+        applicants = vec([NormalizedApplicant(; program=prog, rank=r*progapps[prog]÷100, offerdate=Date(yr, 2, 1), decidedate=Date(yr, 4, 15), accept=prog=="CB" ? true : r < 3, program_history) for prog in ("CB", "NS"), r in 1:6, yr in 2019:2021])
+        yes = yield_errors(σsels, σyields; applicants, program_history)
+        @test yes[1,1] > 0.2
+        @test yes[2,1] < 0.01
     end
 
     @testset "Wait list" begin
@@ -369,7 +382,7 @@ end
         tab = Admit.render_tab_initial(fmatch,
             past_applicants, applicants, fixeddate, program_history, target, 2)
         @test isa(tab, Admit.DashBase.Component)
-        tab = Admit.render_internals(Admit.default_similarity, progs)
+        tab = Admit.render_internals(fmatch, past_applicants, applicants, fixeddate, program_history, Admit.default_similarity, progs)
         @test isa(tab, Admit.DashBase.Component)
     end
 end
