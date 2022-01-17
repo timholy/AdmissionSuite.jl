@@ -223,3 +223,78 @@ function fmatch_prog_rank_date(σsel::Real, σyield::Real, σr::Real, σt::Real;
     progsim = cached_similarity(σsel, σyield; offerdata, yielddata)
     return match_function(; σr, σt, progsim)
 end
+
+# Training: predict the yield
+
+# Predict yield as (∑ᵢ wᵢ * yᵢ)/(∑ᵢ wᵢ), where wᵢ is the similarity between programs
+# and yᵢ is the historical yield
+function estyields(σsel, σyield, trainod, trainyd)
+    progs = collect(keys(trainyd))
+    function estyield(progi)
+        WY = W = 0.0
+        for progj in progs
+            w = program_similarity(progi, progj; σsel, σyield, offerdata=trainod, yielddata=trainyd)
+            y = yield(trainyd[progj])
+            WY += w*y
+            W += w
+        end
+        return WY/W
+    end
+    return Dict(progi => estyield(progi) for progi in progs)
+end
+
+const YieldRecord = typeof((naccepts=0, estyield=0.0, trueyield=0.0))
+
+function yielderr!(records::Union{Nothing,Dict{String,YieldRecord}}, σsel, σyield, trainod, trainyd, testyd)
+    eyields = estyields(σsel, σyield, trainod, trainyd)
+    trueyields = Dict(prog => yield(testyd[prog]) for prog in keys(testyd))
+    progs = intersect(keys(eyields), keys(trueyields))
+    # Mean-square error, weighted by the class size
+    nclass = 0
+    err = 0.0
+    for prog in progs
+        o = testyd[prog]
+        nclass += o.naccepts
+        err += (o.naccepts * (eyields[prog] - trueyields[prog])^2)
+        if records !== nothing
+            records[prog] = (naccepts=o.naccepts, estyield=eyields[prog], trueyield=trueyields[prog])
+        end
+    end
+    return err/nclass
+end
+yielderr(σsel, σyield, trainod, trainyd, testyd) = yielderr!(nothing, σsel, σyield, trainod, trainyd, testyd)
+
+function training_records(applicants, program_history)
+    function package(yr)
+        yrapplicants = filter(app -> app.season == yr, applicants)
+        prevapplicants = filter(app -> app.season < yr, applicants)
+        return (testapplicants=yrapplicants,
+                trainapplicants=prevapplicants,
+                testyd=yielddata(Outcome, yrapplicants),
+                trainod=offerdata(prevapplicants, program_history),
+                trainyd=yielddata(Tuple{Outcome,Outcome,Outcome}, prevapplicants))
+    end
+    yrmin, yrmax = extrema(app->app.season, applicants)
+    return Dict(yr=>package(yr) for yr in yrmin+1:yrmax)
+end
+
+"""
+    yerrs = yield_errors(σsels, σyields; applicants, program_history)
+
+Given lists of possible `σsel` and `σyield` values, compute the cross-program error in predicted yield.
+On output, `yerrs[i,j]` is the yield error when using `σsels[i]` and `σyields[j]`.
+
+The yield error is based on predicting each years' yield from prior data.
+"""
+function yield_errors(σsels, σyields; applicants, program_history)
+    yeardatas = training_records(applicants, program_history)
+    yerrs = zeros(length(σsels), length(σyields))
+    for (yr, yeardata) in yeardatas
+        for (i, σsel) in enumerate(σsels)
+            for (j, σyield) in enumerate(σyields)
+                yerrs[i, j] += yielderr(σsel, σyield, yeardata.trainod, yeardata.trainyd, yeardata.testyd)
+            end
+        end
+    end
+    return yerrs
+end

@@ -266,6 +266,9 @@ Base.zero(::Type{Outcome}) = Outcome()
 Base.show(io::IO, outcome::Outcome) = print(io, "(d=", outcome.ndeclines, ", a=", outcome.naccepts, ")")
 Base.:+(a::Outcome, b::Outcome) = Outcome(a.ndeclines + b.ndeclines, a.naccepts + b.naccepts)
 total(outcome::Outcome) = outcome.ndeclines + outcome.naccepts
+# This supersedes Base.yield, so if needed this should be qualified
+yield(o::Outcome) = o.naccepts/total(o)
+yield(outcomes::Union{Tuple{Outcome,Vararg{Outcome}},AbstractVector{Outcome}}) = yield(sum(outcomes))
 
 function Outcome(app::NormalizedApplicant)
     accept = app.accept
