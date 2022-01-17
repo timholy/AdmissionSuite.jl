@@ -30,6 +30,13 @@ end
         pha = Admit.aggregate(ph, ("OldA" => "NewA",))
         @test pha[ProgramKey("NewA", 2020)] == pd2020
         @test pha[ProgramKey("NewA", 2019)] == pd2019
+        pha = Admit.aggregate(ph, ("OldA" => ["NewA"],))
+        @test pha[ProgramKey("NewA", 2020)] == pd2020
+        @test pha[ProgramKey("NewA", 2019)] == pd2019
+        pha = Admit.aggregate(ph, ("OldA" => ["NewA","NewA"],))
+        @test pha[ProgramKey("NewA", 2020)] == pd2020
+        # Due to integer rounding this next one is a bit funny
+        @test pha[ProgramKey("NewA", 2019)] == ProgramData(2*round(Int, 1/2), 2, 2*round(Int, 3/2), 4, today(), today())
         ph = Dict(ProgramKey("OldA", 2019) => pd2019,
                   ProgramKey("OldB", 2019) => pd2020,)
         pha = Admit.aggregate(ph, ("OldA" => "NewA", "OldB" => "NewA"))
@@ -37,6 +44,19 @@ end
         for fn in (:target_raw, :target_corrected, :nmatriculants, :napplicants)
             @test getfield(pdc, fn) == getfield(pd2019, fn) + getfield(pd2020, fn)
         end
+
+        yd = Dict("OldA" => Outcome(5, 5), "NewA" => Outcome(3, 7))
+        yda = Admit.aggregate(yd, ("OldA" => "NewA",))
+        @test yda["NewA"] == Outcome(8, 12)
+        @test !haskey(yda, "OldA")
+        yda = Admit.aggregate(yd, ("OldA" => ["NewA"],))
+        @test yda["NewA"] == Outcome(8, 12)
+        @test !haskey(yda, "OldA")
+        yd = Dict("OldA" => Outcome(4, 4), "NewA" => Outcome(1, 2), "NewB" => Outcome(3, 1))
+        yda = Admit.aggregate(yd, ("OldA" => ["NewA", "NewB"],))
+        @test yda["NewA"] == Outcome(3, 4)
+        @test yda["NewB"] == Outcome(5, 3)
+
         Admit.delprogram("OldA")
         Admit.delprogram("OldB")
         Admit.delprogram("NewA")

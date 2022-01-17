@@ -5,6 +5,7 @@ using DocStringExtensions
 using AdmitConfiguration
 using CSV
 using NLsolve
+using OrderedCollections
 
 export Service, FacultyRecord
 export faculty_affiliations, program_service, calibrate_service, faculty_effort, faculty_involvement, targets

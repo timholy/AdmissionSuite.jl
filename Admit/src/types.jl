@@ -61,12 +61,24 @@ struct ProgramData
     lastdecisiondate::Date
 end
 ProgramData(; slots=0, nmatriculants=0, napplicants=0, firstofferdate=today(), lastdecisiondate=Date(0)) = ProgramData(slots, slots, nmatriculants, napplicants, date_or_missing(firstofferdate), date_or_missing(lastdecisiondate))
-Base.:+(a::ProgramData, b::ProgramData) = ProgramData(a.target_raw + b.target_raw,
-                                                      a.target_corrected + b.target_corrected,
-                                                      a.nmatriculants + b.nmatriculants,
-                                                      a.napplicants + b.napplicants,
-                                                      today(),
-                                                      Date(0))
+function Base.:+(a::ProgramData, b::ProgramData)
+    # if necessary, mark the dates as uninterpretable
+    fod = a.firstofferdate == b.firstofferdate ? a.firstofferdate : Date(year(today())+10)
+    ldd = a.lastdecisiondate == b.lastdecisiondate ? a.lastdecisiondate : Date(0)
+    ProgramData(a.target_raw + b.target_raw,
+                a.target_corrected + b.target_corrected,
+                a.nmatriculants + b.nmatriculants,
+                a.napplicants + b.napplicants,
+                fod,
+                ldd)
+end
+Base.:/(pd::ProgramData, n::Real) = ProgramData(round(Int, pd.target_raw/n),
+                                                round(Int, pd.target_corrected/n),
+                                                ismissing(pd.nmatriculants) ? missing : round(Int, pd.nmatriculants/n),
+                                                round(Int, pd.napplicants/n),
+                                                pd.firstofferdate,
+                                                pd.lastdecisiondate)
+
 
 """
 `PersonalData` holds relevant data about an individual applicant.
@@ -265,6 +277,7 @@ Outcome() = Outcome(0, 0)
 Base.zero(::Type{Outcome}) = Outcome()
 Base.show(io::IO, outcome::Outcome) = print(io, "(d=", outcome.ndeclines, ", a=", outcome.naccepts, ")")
 Base.:+(a::Outcome, b::Outcome) = Outcome(a.ndeclines + b.ndeclines, a.naccepts + b.naccepts)
+Base.:/(o::Outcome, n::Real) = Outcome(round(Int, o.ndeclines / n), round(Int, o.naccepts / n))
 total(outcome::Outcome) = outcome.ndeclines + outcome.naccepts
 # This supersedes Base.yield, so if needed this should be qualified
 yield(o::Outcome) = o.naccepts/total(o)

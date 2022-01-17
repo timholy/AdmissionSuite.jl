@@ -89,6 +89,8 @@ function setprograms
 end
 
 # low-level internal utilities
+# substitute may return the input string or a list of strings, the caller must
+# be prepared to handle either one
 function substitute(prog, subs)
     for (from, to) in subs
         prog == from && return to
