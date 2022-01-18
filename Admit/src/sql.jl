@@ -1,5 +1,37 @@
 function query_applicants(conn)
-    return DBInterface.execute(conn, "SELECT * FROM dbo.vw_interviewed_hold_outcome")|> DataFrame
+    apps = DBInterface.execute(conn, "SELECT * FROM dbo.vw_interviewed_hold_outcome")|> DataFrame
+    return keep_final_record(apps)
+end
+
+function keep_final_record(apps)
+    appidx = Dict{Tuple{Int,String},Int}()
+    for (i, row) in enumerate(eachrow(apps))
+        if haskey(column_configuration, "season")
+            yr = getproperty(row, column_configuration["season"])
+        else
+            yr = season(todate_or_missing(getproperty(row, column_configuration["offer date"])))
+        end
+        name = getproperty(row, column_configuration["name"])
+        key = (yr, name)
+        if !haskey(appidx, key)
+            appidx[key] = i
+        else
+            j = appidx[key]
+            dti = update_time(row)
+            dtj = update_time(apps[j,:])
+            if dti > dtj
+                appidx[key] = i
+            end
+        end
+    end
+    idx = sort(collect(values(appidx)))
+    return apps[idx,:]
+end
+
+update_time(row) = todate_or_missing(row."Stage Date")   # FIXME
+
+function query_history(conn)
+    return DBInterface.execute(conn, "SELECT * FROM dbo.vw_admit_targets")|> DataFrame
 end
 
 function parserow(row, column_configuration)
@@ -44,7 +76,8 @@ function extract_program_history(applicants::DataFrame, metadata=DummyMetadata()
         sort!(keys_with_sentinel)
         @warn "No first offer date identified for $keys_with_sentinel"
     end
-    return Dict(pk => programdata(fo; metadata[pk]...) for (pk, fo) in firstoffer)
+    # return firstoffer, metadata
+    return Dict(pk => programdata(fo; get(metadata, pk, (slots=0,))...) for (pk, fo) in firstoffer)
 end
 
 programdata(firstofferdate::Date; kwargs...) = ProgramData(; firstofferdate, lastdecisiondate=decisiondeadline(season(firstofferdate)), kwargs...)

@@ -8,7 +8,7 @@ using Preferences
 using Requires
 
 # constants
-export program_lookups, program_abbreviations, program_range, program_substitutions, date_fmt
+export program_lookups, program_abbreviations, program_range, program_substitutions, date_fmt, column_configuration
 # utility functions
 export addprogram, delprogram, validateprogram
 export substitute, merge_program_range!

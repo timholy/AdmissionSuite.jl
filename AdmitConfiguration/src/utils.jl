@@ -62,6 +62,7 @@ function merge_program_range!(progrange, subs)
 end
 
 todate(d::Date) = d
+todate(dt::DateTime) = Date(dt)
 todate(datestr::AbstractString) = Date(datestr, date_fmt[])
 
 todate_or_missing(d) = todate(d)

@@ -10,7 +10,7 @@ end
 
 function getdecidedate(row)
     if getaccept(row)
-        return todate_or_missing(row."Class Member")
+        return todate_or_missing(row."Class Member Date")
     end
-    return todate_or_missing(row."Declined")
+    return todate_or_missing(row."Declined Date")
 end

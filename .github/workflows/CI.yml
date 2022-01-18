@@ -41,7 +41,7 @@ jobs:
       - run: julia --project -e 'using AdmitConfiguration, CSV;
                                  set_programs(joinpath(pkgdir(AdmitConfiguration), "examples", "WashU.csv"));
                                  set_local_functions(joinpath(pkgdir(AdmitConfiguration), "examples", "local_functions_WashU.jl"));
-                                 set_column_configuration("name" => "Applicant", "program" => "Program", "season" => "Enroll Year", "offer date" => "Acceptance Offered");'
+                                 set_column_configuration("name" => "Applicant", "program" => "program_interest", "season" => "enrollment_year", "offer date" => "Accept Offered Date");'
       # To diagnose configuration issues
       - run: cat LocalPreferences.toml
       # Run all tests
