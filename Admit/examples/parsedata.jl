@@ -18,6 +18,7 @@ progdata = Dict(ProgramKey(row."Program", row."Year") => (slots=row."Target", nm
 
 appfile = "AcceptOffered_Hold_Outcome_w_Dates.csv"
 df = DataFrame(CSV.File(appfile))
+const dfmt = dateformat"mm/dd/yyyy"
 
 function parserow(row, program_history; warn::Bool=false)
     name = row."Applicant"
@@ -49,7 +50,6 @@ end
 
 # Extract program history: the date of the first admissions offers, the date of the decision deadline
 gdf = groupby(df, ["Enroll Year", "Program"])
-dfmt = dateformat"mm/dd/yyyy"
 program_history = Dict{ProgramKey,ProgramData}()
 program_offers = Dict{ProgramKey,Tuple{Int,Int}}()   # (nadmit, nhold)
 for g in gdf

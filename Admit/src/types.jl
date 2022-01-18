@@ -24,6 +24,11 @@ end
 ProgramKey(; program, season) = ProgramKey(program, season)
 ProgramKey(program::AbstractString, date::Date) = ProgramKey(program, season(date))
 
+function Base.isless(a::ProgramKey, b::ProgramKey)
+    a.season != b.season && return isless(a.season, b.season)
+    return isless(a.program, b.program)
+end
+
 """
 `ProgramData` stores summary data for a particular program and admissions season.
 
@@ -61,12 +66,24 @@ struct ProgramData
     lastdecisiondate::Date
 end
 ProgramData(; slots=0, nmatriculants=0, napplicants=0, firstofferdate=today(), lastdecisiondate=Date(0)) = ProgramData(slots, slots, nmatriculants, napplicants, date_or_missing(firstofferdate), date_or_missing(lastdecisiondate))
-Base.:+(a::ProgramData, b::ProgramData) = ProgramData(a.target_raw + b.target_raw,
-                                                      a.target_corrected + b.target_corrected,
-                                                      a.nmatriculants + b.nmatriculants,
-                                                      a.napplicants + b.napplicants,
-                                                      today(),
-                                                      Date(0))
+function Base.:+(a::ProgramData, b::ProgramData)
+    # if necessary, mark the dates as uninterpretable
+    fod = a.firstofferdate == b.firstofferdate ? a.firstofferdate : Date(year(today())+10)
+    ldd = a.lastdecisiondate == b.lastdecisiondate ? a.lastdecisiondate : Date(0)
+    ProgramData(a.target_raw + b.target_raw,
+                a.target_corrected + b.target_corrected,
+                a.nmatriculants + b.nmatriculants,
+                a.napplicants + b.napplicants,
+                fod,
+                ldd)
+end
+Base.:/(pd::ProgramData, n::Real) = ProgramData(round(Int, pd.target_raw/n),
+                                                round(Int, pd.target_corrected/n),
+                                                ismissing(pd.nmatriculants) ? missing : round(Int, pd.nmatriculants/n),
+                                                round(Int, pd.napplicants/n),
+                                                pd.firstofferdate,
+                                                pd.lastdecisiondate)
+
 
 """
 `PersonalData` holds relevant data about an individual applicant.
@@ -175,6 +192,7 @@ Some are required (those without a default value), others are optional:
 """
 function NormalizedApplicant(; name::AbstractString="",
                                program::AbstractString,
+                               season::Union{Integer,Missing}=missing,
                                urmdd::Union{Bool,Missing}=missing,
                                foreign::Union{Bool,Missing}=missing,
                                rank::Union{Integer,Missing}=missing,
@@ -183,12 +201,16 @@ function NormalizedApplicant(; name::AbstractString="",
                                accept::Union{Bool,Missing}=missing,
                                program_history)
     program = validateprogram(program)
-    pdata = program_history[ProgramKey(program, season(offerdate))]
+    if season === missing && isa(offerdate, Date)
+        season = Admit.season(offerdate)
+    end
+    season = Int16(season)::Int16
+    pdata = program_history[ProgramKey(program, season)]
     normrank = applicant_score(rank, pdata)
     toffer = ismissing(offerdate) ? missing : normdate(offerdate, pdata)
     tdecide = ismissing(decidedate) ? missing : normdate(decidedate, pdata)
     accept = ismissing(accept) ? missing : accept
-    return NormalizedApplicant(PersonalData(name; urmdd, foreign), program, season(offerdate), normrank, toffer, tdecide, accept)
+    return NormalizedApplicant(PersonalData(name; urmdd, foreign), program, season, normrank, toffer, tdecide, accept)
 end
 # replacing/updating values
 function NormalizedApplicant(applicant::NormalizedApplicant; kwargs...)
@@ -265,6 +287,7 @@ Outcome() = Outcome(0, 0)
 Base.zero(::Type{Outcome}) = Outcome()
 Base.show(io::IO, outcome::Outcome) = print(io, "(d=", outcome.ndeclines, ", a=", outcome.naccepts, ")")
 Base.:+(a::Outcome, b::Outcome) = Outcome(a.ndeclines + b.ndeclines, a.naccepts + b.naccepts)
+Base.:/(o::Outcome, n::Real) = Outcome(round(Int, o.ndeclines / n), round(Int, o.naccepts / n))
 total(outcome::Outcome) = outcome.ndeclines + outcome.naccepts
 # This supersedes Base.yield, so if needed this should be qualified
 yield(o::Outcome) = o.naccepts/total(o)

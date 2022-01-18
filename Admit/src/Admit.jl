@@ -3,12 +3,14 @@ module Admit
 using Dates
 using DocStringExtensions
 using CSV
+using DataFrames
 using Measurements
 using Statistics
 using Random
 using DataStructures
 using ProgressMeter
 using AdmitConfiguration
+using ODBC
 
 # Types
 export ProgramKey, ProgramData, PersonalData, NormalizedApplicant, Outcome, ProgramYieldPrediction
@@ -29,6 +31,7 @@ include("utils.jl")
 include("similarity.jl")
 include("predict.jl")
 include("io.jl")
+include("sql.jl")
 include("web.jl")
 
 end

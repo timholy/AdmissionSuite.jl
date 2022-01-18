@@ -3,59 +3,46 @@ module AdmitConfiguration
 using Dates
 using UUIDs
 using Missings
+using ODBC
 using Preferences
 using Requires
 
 # constants
-export program_lookups, program_abbreviations, program_range, program_substitutions
-# functions
-export addprogram, delprogram, validateprogram, setprograms
+export program_lookups, program_abbreviations, program_range, program_substitutions, date_fmt
+# utility functions
+export addprogram, delprogram, validateprogram
 export substitute, merge_program_range!
+export todate, todate_or_missing
+# Preference-setting
+export set_programs, set_dsn, set_column_configuration, set_local_functions
+# SQL
+export connectdsn
+# Parsing
+export getaccept, getdecidedate
 
+const suitedir = dirname(dirname(@__DIR__))
 const program_lookups = Dict{String,String}()
 const program_abbreviations = Set{String}()
 const program_range = Dict{String,UnitRange{Int}}()
 const program_substitutions = Dict{String,Vector{String}}()
+const sql_dsn = Ref{String}()
+const date_fmt = Ref(dateformat"mm/dd/yyyy")
+const local_functions = Ref{Union{String,Nothing}}()
+const column_configuration = Dict{String,String}()
 
-"""
-    addprogram(abbrv::AbstractString)
-
-Dynamically add a new program with abbreviation `abbrv`.
-
-This is primarily used for writing tests; most users should use [`setprograms`](@ref) instead.
-"""
-function addprogram(abbrv::AbstractString)
-    push!(program_abbreviations, abbrv)
-    program_range[abbrv] = 0:year(today())
-    return
+include("sql.jl")
+include("local_function_stubs.jl")
+# These must be loaded at compile time
+local_functions[] = @load_preference("local_functions")
+if isa(local_functions[], String)
+    include(local_functions[])
 end
+include("utils.jl")
+
+## Preferences
 
 """
-    delprogram(abbrv::AbstractString)
-
-Dynamically delete the program with abbreviation `abbrv`.
-
-This is primarily used for writing tests; most users should use [`setprograms`](@ref) instead.
-"""
-function delprogram(abbrv::AbstractString)
-    delete!(program_abbreviations, abbrv)
-    delete!(program_range, abbrv)
-    return
-end
-
-"""
-    prog = validateprogram(program::AbstractString)
-
-Return the abbreviation `prog` from either a valid abbreviation or valid long-form program name `program`.
-An error is thrown if the program is not recognized.
-
-See [`setprograms`](@ref) to configure your local programs, or [`addprogram`](@ref) and [`delprogram`](@ref)
-to configure them dynamically.
-"""
-validateprogram(program::AbstractString) = program ∈ program_abbreviations ? String(program) : program_lookups[program]
-
-"""
-    setprograms(filename; force=false)
+    set_programs(filename; force=false)
 
 Configure your local programs, given a CSV file `filename` of the format in `examples/WashU.csv`.
 (You can create such files with a spreadsheet program, exporting the table in "Comma separated value" format.)
@@ -76,35 +63,73 @@ will be available).
 If you're re-setting the configuration from an existing one, use `force=true`.
 
 !!! warning
-    You need to load the CSV package (`using CSV`) for `setprograms` to be available. See the AdmissionSuite
+    You need to load the CSV package (`using CSV`) for `set_programs` to be available. See the AdmissionSuite
     web documentation for more information.
 """
-function setprograms
-    # This is loaded conditionally, see `__init__` and `setprograms.jl`
+function set_programs
+    # This is loaded conditionally, see `__init__` and `set_programs.jl`
 end
 
-# low-level internal utilities
-function substitute(prog, subs)
-    for (from, to) in subs
-        prog == from && return to
+"""
+    set_dsn(name)
+
+Configure a Data Source `name` for a SQL database
+"""
+function set_dsn(name::AbstractString)
+    @set_preferences!("sql_dsn" => name)
+end
+
+"""
+    set_local_functions(filename)
+
+Configure custom functions used in parsing applicant tables. The following functions must be implemented:
+
+- [`getaccept`](@ref)
+- [`getdecidedate`](@ref)
+
+Create these functions and save them to a file somewhere permanent on your system.
+Then pass the filename to `set_local_functions` to register this file with AdmissionSuite.
+"""
+function set_local_functions(str::AbstractString)
+    filepath = abspath(str)
+    if isfile(filepath)
+        @set_preferences!("local_functions" => filepath)
+    else
+        error(filepath, " not found")
     end
-    return prog
 end
 
-function merge_program_range!(progrange, subs)
-    for (from, tos) in subs
-        rfrom = progrange[from]
-        for to in tos
-            rto = progrange[to]
-            progrange[to] = min(minimum(rfrom), minimum(rto)):maximum(rto)
+"""
+    set_column_configuration(stdname1 => dbcolname1, ...)
+
+Configure the names of columns `dbcolname`s in your database so that standard properties can be extracted.
+The properties that must be configured are:
+
+- "name": the name of the column that stores the applicant name
+- "program": the name of the column that stores the program the applicant is being considered for admission in
+- "offer date": the name of the column that stores the date at which an offer of admission was extended
+- "season" (optional): the name of the column that can be used to extract the application season (e.g., 2022)
+  if an offer date is not available for a candidate
+
+# Example
+
+```
+set_column_configuration("name" => "Applicant Name", "program" => "Program", "offer date" => "Acceptance Offered")
+```
+sets up the names of three columns in your database tables.
+"""
+function set_column_configuration(pairs...)
+    function rekey((key, val))
+        if key ∈ ("name", "program", "offer date", "season")
+            isa(val, AbstractString) || error(key, " must be a string")
+        else
+            error("unrecognized key ", key)
         end
+        return key => val
     end
-    for (from, _) in subs
-        delete!(progrange, from)
-    end
-    return progrange
+    pairs = map(rekey, pairs)
+    @set_preferences!("column_configuration" => Dict(pairs))
 end
-
 
 function __init__()
     @require CSV = "336ed68f-0bac-5ca0-87d4-7b16caf5d00b" include("setprograms.jl")
@@ -117,6 +142,7 @@ function loadprefs()
     if !onloadpath
         push!(LOAD_PATH, suitedir)
     end
+
     plook = @load_preference("program_lookups")
     plook !== nothing && merge!(program_lookups, plook)
     pabv = @load_preference("program_abbreviations")
@@ -129,12 +155,18 @@ function loadprefs()
     end
     psubs = @load_preference("program_substitutions")
     psubs !== nothing && merge!(program_substitutions, psubs)
+    pdsn = @load_preference("sql_dsn")
+    pdsn !== nothing && (sql_dsn[] = pdsn)
+
+    cc = @load_preference("column_configuration")
+    if cc !== nothing
+        merge!(column_configuration, cc)
+    end
+
     if !onloadpath
         pop!(LOAD_PATH)
     end
     return nothing
 end
-
-const suitedir = dirname(dirname(@__DIR__))
 
 end

@@ -1,18 +1,23 @@
 ratio0(a, b) = iszero(a) ? a/oneunit(b) : a/b
 
-function aggregate(facrec::FacultyRecord, mergepairs, covered=Set{String}())
-    empty!(covered)
-    progs = String[]
+addnames!(unames, name::AbstractString) = push!(unames, name)
+function addnames!(unames, names::AbstractVector{<:AbstractString})
+    for name in names
+        addnames!(unames, name)
+    end
+end
+
+function aggregate(facrec::FacultyRecord, mergepairs, progs=OrderedSet{String}())
+    empty!(progs)
     for prog in facrec.programs
-        sprog = substitute(prog, mergepairs)
-        sprog ∈ covered || push!(progs, sprog)
-        push!(covered, sprog)
+        sprogs = substitute(prog, mergepairs)
+        addnames!(progs, sprogs)
     end
     service = Dict{String,Service}()
     for (prog, s) in facrec.service
         aggregate!(service, substitute(prog, mergepairs), s)
     end
-    return FacultyRecord(facrec.start, progs, sort(collect(service); by=first))
+    return FacultyRecord(facrec.start, collect(progs), sort(collect(service); by=first))
 end
 
 function aggregate!(service::AbstractDict{String,Service}, sprog::AbstractString, s)
@@ -33,6 +38,6 @@ end
 Aggregate faculty records, merging program `from => to` pairs from `mergepairs`.
 """
 function aggregate(facrecs::ListPairs{<:AbstractString,FacultyRecord}, mergepairs)
-    covered = Set{String}()
+    covered = OrderedSet{String}()
     return [name=>aggregate(facrec, mergepairs, covered) for (name, facrec) in facrecs]
 end

@@ -20,8 +20,10 @@ makedocs(;
         "Installation" => "installation.md",
         "Configuration" => "configuration.md",
         "Web application" => "web.md",
-        "Offers" => "simulation.md",
-        "Targets" => "targets.md",
+        "How AdmissionSuite works" => [
+            "Offers" => "simulation.md",
+            "Targets" => "targets.md",
+        ],
         "API" => "api.md"
     ],
 )

@@ -66,12 +66,40 @@ Aggregate program history, merging program `from => to` pairs from `mergepairs`.
 function aggregate(program_history::ListPairs{ProgramKey, ProgramData}, mergepairs)
     ph = Dict{ProgramKey, ProgramData}()
     for (pk, pd) in program_history
-        pksubs = ProgramKey(substitute(pk.program, mergepairs), pk.season)
-        if !haskey(ph, pksubs)
-            ph[pksubs] = pd
-        else
-            ph[pksubs] += pd
-        end
+        sprogs = substitute(pk.program, mergepairs)
+        agg!(ph, pk, pd, sprogs)
+    end
+    return ph
+end
+
+function aggregate(yd::ListPairs{String, Outcome}, mergepairs)
+    ph = Dict{String, Outcome}()
+    for (prog, pd) in yd
+        sprogs = substitute(prog, mergepairs)
+        agg!(ph, prog, pd, sprogs)
+    end
+    return ph
+end
+
+
+agg!(ph, pk, pd, prog::AbstractString) = accum!(ph, makekey(pk, prog), pd)
+function agg!(ph, pk, pd, progs::AbstractVector{<:AbstractString})
+    n = length(progs)
+    n == 1 && return agg!(ph, pk, pd, progs[1])
+    for prog in progs
+        agg!(ph, pk, pd/n, prog)
+    end
+    return ph
+end
+
+makekey(pk::ProgramKey, prog::AbstractString) = ProgramKey(prog, pk.season)
+makekey(::AbstractString, prog::AbstractString) = prog
+
+function accum!(ph, pk, pd)
+    if !haskey(ph, pk)
+        ph[pk] = pd
+    else
+        ph[pk] += pd
     end
     return ph
 end

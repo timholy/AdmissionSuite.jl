@@ -1,13 +1,13 @@
 # This file is machine-generated - editing it directly is not advised
 
 [[AdmissionTargets]]
-deps = ["AdmitConfiguration", "CSV", "Dates", "DocStringExtensions", "NLsolve"]
+deps = ["AdmitConfiguration", "CSV", "Dates", "DocStringExtensions", "NLsolve", "ODBC", "OrderedCollections"]
 path = ".."
 uuid = "9b29e739-6137-49c0-ab44-b63304efda64"
 version = "0.2.0"
 
 [[AdmitConfiguration]]
-deps = ["CSV", "Dates", "Missings", "Preferences", "Requires", "UUIDs"]
+deps = ["CSV", "Dates", "Missings", "ODBC", "Preferences", "Requires", "UUIDs"]
 path = "../../AdmitConfiguration"
 uuid = "19a2e0a6-566e-4c00-8888-a0edb19dbca0"
 version = "0.2.0"
@@ -102,6 +102,11 @@ git-tree-sha1 = "b618084b49e78985ffa8422f32b9838e397b9fc2"
 uuid = "a8cc5b0e-0ffa-5ad4-8c14-923d3ee1735f"
 version = "4.1.0"
 
+[[DBInterface]]
+git-tree-sha1 = "9b0dc525a052b9269ccc5f7f04d5b3639c65bca5"
+uuid = "a10d1c49-ce27-4219-8d33-6db1a4562965"
+version = "2.5.0"
+
 [[DataAPI]]
 git-tree-sha1 = "cc70b17275652eb47bc9e5f81635981f13cea5c8"
 uuid = "9a962f9c-6df0-11e9-0e5d-c546b8b5ee8a"
@@ -127,6 +132,18 @@ version = "1.0.0"
 [[Dates]]
 deps = ["Printf"]
 uuid = "ade2ca70-3891-5945-98fb-dc099432e06a"
+
+[[DecFP]]
+deps = ["DecFP_jll", "Printf", "Random", "SpecialFunctions"]
+git-tree-sha1 = "a836d5799ae9772d74861755d95df306a3056cac"
+uuid = "55939f99-70c6-5e9b-8bb0-5071ed7d61fd"
+version = "1.2.0"
+
+[[DecFP_jll]]
+deps = ["Artifacts", "JLLWrappers", "Libdl", "Pkg"]
+git-tree-sha1 = "9982cddeac476ed4ead831baff7b3f9d084579c1"
+uuid = "47200ebd-12ce-5be5-abb7-8e082af23329"
+version = "2.0.3+0"
 
 [[DelimitedFiles]]
 deps = ["Mmap"]
@@ -300,6 +317,12 @@ uuid = "29816b5a-b9ab-546f-933c-edad1886dfa8"
 [[Libdl]]
 uuid = "8f399da3-3557-5675-b5ff-fb832c97cbdb"
 
+[[Libiconv_jll]]
+deps = ["Artifacts", "JLLWrappers", "Libdl", "Pkg"]
+git-tree-sha1 = "42b62845d70a619f063a7da093d995ec8e15e778"
+uuid = "94ce4f54-9a6c-5748-9c1c-f9c7231a4531"
+version = "1.16.1+1"
+
 [[LineSearches]]
 deps = ["LinearAlgebra", "NLSolversBase", "NaNMath", "Parameters", "Printf"]
 git-tree-sha1 = "f27132e551e959b3667d8c93eae90973225032dd"
@@ -370,6 +393,12 @@ version = "0.3.6"
 
 [[NetworkOptions]]
 uuid = "ca575930-c2e3-43a9-ace4-1e988b2c1908"
+
+[[ODBC]]
+deps = ["DBInterface", "Dates", "DecFP", "Libdl", "Printf", "Random", "Tables", "UUIDs", "Unicode", "iODBC_jll", "unixODBC_jll"]
+git-tree-sha1 = "7e3ce82387793ee6e787f9dbf78728602f97c7ad"
+uuid = "be6f12e9-ca4f-5eb2-a339-a4f995cc0291"
+version = "1.0.4"
 
 [[OpenBLAS_jll]]
 deps = ["Artifacts", "CompilerSupportLibraries_jll", "Libdl"]
@@ -623,6 +652,12 @@ version = "1.4.1"
 deps = ["Libdl"]
 uuid = "83775a58-1f1d-513f-b197-d71354ab007a"
 
+[[iODBC_jll]]
+deps = ["Libdl", "Pkg"]
+git-tree-sha1 = "275437992b9d383ec34e0712ff70f0cc2bff2669"
+uuid = "80337aba-e645-5151-a517-44b13a626b79"
+version = "3.52.13+1"
+
 [[nghttp2_jll]]
 deps = ["Artifacts", "Libdl"]
 uuid = "8e850ede-7688-5339-a07c-302acd2aaf8d"
@@ -630,3 +665,9 @@ uuid = "8e850ede-7688-5339-a07c-302acd2aaf8d"
 [[p7zip_jll]]
 deps = ["Artifacts", "Libdl"]
 uuid = "3f19e933-33d8-53b3-aaab-bd5110c3b7a0"
+
+[[unixODBC_jll]]
+deps = ["Libdl", "Libiconv_jll", "Pkg"]
+git-tree-sha1 = "7240ac85d0e65d0a6a45d19404472f8b4665e551"
+uuid = "1841a5aa-d9e2-579c-8226-32ed2af93ab1"
+version = "2.3.7+0"
