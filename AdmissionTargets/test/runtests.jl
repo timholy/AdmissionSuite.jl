@@ -1,3 +1,7 @@
+# Tests for AdmissionTargets
+# Passing these tests requires that you first configure the package
+# See the AdmissionSuite/.github/workflows/CI.yml file for the needed configuration steps
+
 using AdmissionTargets
 using Dates
 using Test

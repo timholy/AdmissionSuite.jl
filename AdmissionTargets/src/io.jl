@@ -45,7 +45,6 @@ function affiliations(row)
     return programs
 end
 
-dfmt = dateformat"mm/dd/yyyy"
 return Dict(map(rows) do row
     approval = get(row, Symbol("DBBS Approval Date"), missing)
     if approval === missing
@@ -53,6 +52,6 @@ return Dict(map(rows) do row
     else
         approval = match(r"(\d+/\d+/\d+)", approval).captures[1] # extract just the date (omit time)
     end
-    row.Faculty => FacultyRecord(approval === missing ? today() - Day(1) : Date(approval, dfmt), affiliations(row), program_involvement(row))
+    row.Faculty => FacultyRecord(approval === missing ? today() - Day(1) : Date(approval, date_fmt[]), affiliations(row), program_involvement(row))
 end)
 end

@@ -1,5 +1,10 @@
+# Tests for Admit
+# Passing these tests requires that you first configure the package
+# See the AdmissionSuite/.github/workflows/CI.yml file for the needed configuration steps
+
 using Admit
 using Dates
+using DataFrames
 using Test
 
 function countby(list)
@@ -130,8 +135,8 @@ end
         past_applicants = read_applicant_data(joinpath(@__DIR__, "data", "applicantdata.csv"); program_history)
         @test length(past_applicants) == 36
         new_applicants = [(program="NS", rank=7, offerdate=Date("2021-01-13")),
-                        (program="NS", rank=3, offerdate=Date("2021-01-13")),
-                        (program="CB", rank=6, offerdate=Date("2021-03-25")),
+                          (program="NS", rank=3, offerdate=Date("2021-01-13")),
+                          (program="CB", rank=6, offerdate=Date("2021-03-25")),
         ]
         new_applicants = [NormalizedApplicant(; app..., program_history) for app in new_applicants]
         # The data were set up to be symmetric except for date
@@ -156,6 +161,27 @@ end
             matriculation_probability(like, past_applicants)
         end
         @test all(x -> 0 <= x <= 1, pmatric)
+    end
+
+    @testset "SQL table parsing" begin
+        df = Admit.CSV.File(joinpath(@__DIR__, "data", "sql_table.csv")) |> DataFrame
+        program_history = @test_logs (:warn, r"No first offer date identified for.*MGG.*PMB") Admit.extract_program_history(df)
+        @test program_history[ProgramKey("MGG", 2021)].firstofferdate == typemax(Date)
+        @test program_history[ProgramKey("MMMP", 2021)].firstofferdate == Date(2021, 2, 3)
+        @test program_history[ProgramKey("NS", 2021)].firstofferdate == Date(2021, 2, 10)
+        metadata = Dict(ProgramKey("MGG",  2021) => (slots =  9, nmatriculants = 10, napplicants = 100),
+                        ProgramKey("MMMP", 2021) => (slots = 11, nmatriculants = 12, napplicants = 101),
+                        ProgramKey("NS",   2021) => (slots = 13, nmatriculants = 14, napplicants = 102),
+                        ProgramKey("PMB",  2021) => (slots = 15, nmatriculants = 16, napplicants = 103),
+        )
+        program_history = @test_logs (:warn, r"No first offer date identified for.*MGG.*PMB") Admit.extract_program_history(df, metadata)
+        @test program_history[ProgramKey("MGG", 2021)].nmatriculants == 10
+        applicants = Admit.parse_applicants(df, program_history)
+        @test length(applicants) == 4
+        @test applicants[1].program == "MGG"  && ismissing(applicants[1].normofferdate) && ismissing(applicants[1].accept)
+        @test applicants[2].program == "MMMP" && applicants[2].normofferdate == 0 && !applicants[2].accept
+        @test applicants[3].program == "NS"   && applicants[3].normofferdate == 0 &&  applicants[3].accept
+        @test applicants[4].program == "PMB"  && ismissing(applicants[4].normofferdate) && ismissing(applicants[4].accept)
     end
 
     @testset "Model training" begin

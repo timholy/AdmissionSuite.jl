@@ -10,8 +10,6 @@ the [first cross-departmental graduate training program in the United States](ht
 
 The suite is organized into three sub-packages:
 
-- `Admit` focuses on managing offers of admission and predicting the probability that candidates will accept them.
-  It includes a browser-based application that can be used by admissions professionals to manage the
-admissions season.
+- `Admit` focuses on managing offers of admission and predicting the probability that candidates will accept them. It includes a browser-based application that can be used by admissions professionals to manage the admissions season.
 - `AdmissionTargets` focuses on allocating "slots" among different programs, given a total target number of incoming students.
 - `AdmitConfiguration` is used to configure the suite for your local institution

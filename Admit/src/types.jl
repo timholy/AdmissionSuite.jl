@@ -24,6 +24,11 @@ end
 ProgramKey(; program, season) = ProgramKey(program, season)
 ProgramKey(program::AbstractString, date::Date) = ProgramKey(program, season(date))
 
+function Base.isless(a::ProgramKey, b::ProgramKey)
+    a.season != b.season && return isless(a.season, b.season)
+    return isless(a.program, b.program)
+end
+
 """
 `ProgramData` stores summary data for a particular program and admissions season.
 
@@ -187,6 +192,7 @@ Some are required (those without a default value), others are optional:
 """
 function NormalizedApplicant(; name::AbstractString="",
                                program::AbstractString,
+                               season::Union{Integer,Missing}=missing,
                                urmdd::Union{Bool,Missing}=missing,
                                foreign::Union{Bool,Missing}=missing,
                                rank::Union{Integer,Missing}=missing,
@@ -195,12 +201,16 @@ function NormalizedApplicant(; name::AbstractString="",
                                accept::Union{Bool,Missing}=missing,
                                program_history)
     program = validateprogram(program)
-    pdata = program_history[ProgramKey(program, season(offerdate))]
+    if season === missing && isa(offerdate, Date)
+        season = Admit.season(offerdate)
+    end
+    season = Int16(season)::Int16
+    pdata = program_history[ProgramKey(program, season)]
     normrank = applicant_score(rank, pdata)
     toffer = ismissing(offerdate) ? missing : normdate(offerdate, pdata)
     tdecide = ismissing(decidedate) ? missing : normdate(decidedate, pdata)
     accept = ismissing(accept) ? missing : accept
-    return NormalizedApplicant(PersonalData(name; urmdd, foreign), program, season(offerdate), normrank, toffer, tdecide, accept)
+    return NormalizedApplicant(PersonalData(name; urmdd, foreign), program, season, normrank, toffer, tdecide, accept)
 end
 # replacing/updating values
 function NormalizedApplicant(applicant::NormalizedApplicant; kwargs...)

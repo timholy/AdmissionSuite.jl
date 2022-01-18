@@ -1,9 +1,8 @@
-function setprograms(filename::AbstractString; kwargs...)
+function set_programs(filename::AbstractString; kwargs...)
     empty!(program_lookups)
     empty!(program_abbreviations)
     empty!(program_range)
     empty!(program_substitutions)
-    rm(joinpath(@__DIR__, "LocalPreferences.toml"); force=true)
     tbl = CSV.File(filename)
     for row in tbl
         push!(program_abbreviations, row.Abbreviation)

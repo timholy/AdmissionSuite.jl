@@ -16,7 +16,7 @@ jobs:
           version: '1.6'
           show-versioninfo: true         # this causes versioninfo to be printed to the action log
       - uses: julia-actions/julia-buildpkg@latest
-      - run:  julia --project -e 'using AdmitConfiguration, CSV; setprograms(joinpath(pkgdir(AdmitConfiguration), "examples", "WashU.csv"))'
+      - run:  julia --project -e 'using AdmitConfiguration, CSV; set_programs(joinpath(pkgdir(AdmitConfiguration), "examples", "WashU.csv"))'
       - uses: julia-actions/julia-docdeploy@latest
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

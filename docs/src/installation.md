@@ -2,7 +2,7 @@
 
 ## Install Julia
 
-Admit is written in [Julia](https://julialang.org/), a free, modern, high-performance language that excels for
+AdmissionSuite is written in [Julia](https://julialang.org/), a free, modern, high-performance language that excels for
 analytics and machine learning. Visit the Downloads page and install either:
 
 - the "LTS" = "Long Term Support" version (recommended)

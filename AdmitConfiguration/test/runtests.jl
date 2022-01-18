@@ -1,3 +1,7 @@
+# Tests for AdmitConfiguration
+# Passing these tests requires that you first configure the package
+# See the AdmissionSuite/.github/workflows/CI.yml file for the needed configuration steps
+
 using AdmitConfiguration
 using CSV
 using Test
@@ -11,7 +15,7 @@ using Test
             cp(lp, tmpfn)
         end
         washu = joinpath(dirname(@__DIR__), "examples", "WashU.csv")
-        setprograms(washu)
+        set_programs(washu)
         @test "EEPB" ∈ program_abbreviations
         @test program_lookups["Immunology"] == "IMM"
         @test program_range["PB"] == 2004:2013
@@ -19,7 +23,7 @@ using Test
         @test isfile(lp)
         rm(lp; force=true)
         simple = joinpath(@__DIR__, "data", "simple.csv")
-        setprograms(simple; force=true)
+        set_programs(simple; force=true)
         AdmitConfiguration.loadprefs()
         @test "ProgA" ∈ program_abbreviations
         @test "EEPB" ∉ program_abbreviations

@@ -4,6 +4,14 @@ CurrentModule = AdmitConfiguration
 
 # AdmitConfiguration
 
+Configuring AdmissionSuite is more complex than for typical packages (most of which require no configuration at all). To work seamlessly with your admissions system, it must
+
+- know the names and some information about the programs for which you are offering admissions
+- be able to connect to your database of applicants and run queries
+- be able to parse the tables in whatever format your institution has chosen for representing the data
+
+Each of these requires custom configuration.
+
 ## Configuring your programs
 
 !!! info
@@ -14,19 +22,23 @@ Using a spreadsheet program, create a table that, at a minimum, has a single col
 
 ![programs](assets/programs.png)
 
-The `Abbreviation` column must list all your programs. This should be whatever "tag" you like to use to refer to each program, and should not be too long as it will need to fit in dropdown boxes in `Admit`. Full names can optionally be listed in `ProgramName`, and indeed this must be set if your database stores records by full program names. For the remaining columns, see the documentation on [`setprograms`](@ref).  If you need a complete example, see the file `examples/WashU.csv` within this package repository.
+The `Abbreviation` column must list all your programs. This should be whatever "tag" you like to use to refer to each program, and should not be too long as it will need to fit in dropdown boxes in `Admit`. Full names can optionally be listed in `ProgramName`, and indeed this must be set if your database stores records by full program names. For the remaining columns, see the documentation on [`set_programs`](@ref).  If you need a complete example, see the file `examples/WashU.csv` within this package repository.
 
 Once done, save the table in [Comma-separated value (CSV) format](https://en.wikipedia.org/wiki/Comma-separated_values) using your spreadsheet program's "Save as" or "Export" functionality. Then, in Julia execute the following set of statements:
 
 ```julia
 using AdmissionSuite, AdmitConfiguration
 using CSV
-setprograms("/path/to/saved/file.csv")  # replace this with the specific path to your CSV file
+set_programs("/path/to/saved/file.csv")  # replace this with the specific path to your CSV file
 ```
 
 You are now done configuring your programs.
 
 ## Configuring database access
+
+!!! info
+    This step only needs to be performed once to establish connectivity to your SQL database.
+    If you change your server URL or other features, you may need to redo these steps.
 
 `Admit` can directly query applicant records through a SQL interface. This has been tested on Windows and Linux, but may work with small modifications on Mac.
 
@@ -77,9 +89,7 @@ where `libpath` should be the path to the library on your own system. Library fi
 
 Now `"MSODBC"` is a shortcut for the actual driver library.
 
-### Option 1: configuring the Data Source (DSN)
-
-Use either a DSN or a connection string; the two are nearly equivalent except for minor differences in syntax.
+### Configuring the Data Source (DSN)
 
 #### From within the ODBC configuration utility (Windows)
 
@@ -110,42 +120,34 @@ Now, `<dnsname>` (`"DBBS"` in the example above) is a shortcut for the DSN.
 
 Check your connection described [above](@ref conncheck).
 
-### Option 2: using a connection string
-
-!!! warning
-    Probably delete this section
-
-As an alternative, you can use a full connection string. After [adding a driver](@ref driver), launch Julia and execute
-
-```julia
-julia> using AdmissionSuite
-
-julia> conn = conn = ODBC.Connection("Driver=MSODBC;SERVER=<SQL server URL>;DATABASE=<database name>)
-```
-
-where `<>` are meant to be filled in for your local configuration. For example, for WashU's DBBS this would start
-
-```julia
-julia> conn = ODBC.Connection("Driver=MSODBC;SERVER=someurl.wustl.edu;DATABASE=DBBS;UID=...")
-```
-
-
 ### [Making your connection automatic](@id automatic)
 
-If you have a DSN, use
+Once you have a DSN, use
 
 ```julia
 julia> using AdmissionSuite, AdmitConfiguration
 
-julia> setdsn(<dnsname>)
+julia> set_dsn(<dnsname>)
 ```
 
 Henceforth `Admit` will connect to the database as needed, all you have to do is respond to password prompts.
 
-If you instead connect with a connect string, change the previous line to
+## Configuring your data tables
 
-```julia
-julia> setconnect("Driver=MSODBC;SERVER=...")
-```
+Once you can connect to the database, the final step is to configure the ability to extract information from
+the tables within it. Interally, AdmissionSuite converts the table into a [DataFrame](https://dataframes.juliadata.org/stable/), which is similar to
+a spreadsheet. AdmissionSuite needs to know the names of the columns from which it can extract particular pieces of information.
 
-with the connect string you verified above.  [`setdsn`](@ref) and its alternative [`setconnect`](@ref) saves your local configuration so that it gets loaded automatically every time you start `AdmissionSuite`.
+Extractors come in two flavors: "by name" and "custom function". The latter are used in more complex situations
+where you might need to reference multiple columns in order to extract a particular item.
+
+### "By name" columns
+
+"By name" configuration is done with [`set_column_configuration`](@ref); see its documentation for details.
+
+### "Custom function" configuration
+
+These require that you write a few Julia functions and save them to a file. You then register these functions
+with [`set_local_functions`](@ref); see its documentation for details about which functions need to be implemented and examples of how to write them.
+
+If this step is daunting, seek help from a local Julia user or contact Tim Holy (WashU) for assistance.
