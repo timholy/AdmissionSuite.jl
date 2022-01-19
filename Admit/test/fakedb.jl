@@ -12,8 +12,8 @@ DBInterface.execute(conn::FakeConn, tablename::String) =
     tablename == "programs"   ? conn.programs   : error(tablename, " unrecognized")
 
 @testset "fakedb" begin
-    apps     = CSV.File(joinpath("data", "sql_applicant_table_with_duplicates.csv")) |> DataFrame
-    programs = CSV.File(joinpath("data", "sql_program_table.csv")) |> DataFrame
+    apps     = CSV.File(joinpath(@__DIR__, "data", "sql_applicant_table_with_duplicates.csv")) |> DataFrame
+    programs = CSV.File(joinpath(@__DIR__, "data", "sql_program_table.csv")) |> DataFrame
     conn = FakeConn(apps, programs)
 
     # Save column_configuration and sql_queries before we modify them
