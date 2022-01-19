@@ -40,6 +40,10 @@ function normdate(t::Date, pdata::ProgramData)
 end
 normdate(t::Real, pdata) = t
 
+# For graduate programs, this is set nationally
+# https://cgsnet.org/april-15-resolution
+decisiondeadline(yr::Integer) = Date(yr, 4, 15)
+
 applicant_score(rank::Int, pdata) = rank / pdata.napplicants
 applicant_score(rank::Missing, pdata) = rank
 

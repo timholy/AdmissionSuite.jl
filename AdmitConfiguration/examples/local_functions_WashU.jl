@@ -5,12 +5,17 @@ function getaccept(row)
     elseif choice ∈ ("Declined", "Interviewed, Reject", "Withdrew Following Interview")
         return false
     end
-    error("unrecognized choice ", choice)
+    return missing
 end
 
 function getdecidedate(row)
-    if getaccept(row)
+    acc = getaccept(row)
+    if acc === true
         return todate_or_missing(row."Class Member Date")
+    elseif acc === false
+        return todate_or_missing(row."Declined Date")
     end
-    return todate_or_missing(row."Declined Date")
+    return missing
 end
+
+when_updated(row) = (row."Stage Date")::DateTime
