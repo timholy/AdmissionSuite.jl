@@ -40,6 +40,7 @@ jobs:
       # Configure the suite (this omits SQL connection configuration since this isn't available on CI)
       - run: |
           julia --project -e 'using AdmissionSuite; include(joinpath(pkgdir(AdmitConfiguration), "examples", "fake_configure_WashU.jl"));'
+          julia --project -e 'cd("AdmitConfiguration"); using Pkg; Pkg.activate("."); using AdmitConfiguration; set_local_functions(joinpath(@__DIR__, "examples", "local_functions_WashU.jl"))'
           julia --project -e 'cd("Admit"); using Pkg; Pkg.activate("."); using Admit; Admit.AdmitConfiguration.set_local_functions(joinpath(dirname(@__DIR__), "AdmitConfiguration", "examples", "local_functions_WashU.jl"))'
       # To diagnose configuration issues
       - run: cat LocalPreferences.toml
