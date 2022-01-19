@@ -18,7 +18,7 @@ Express `t` as a fraction of the gap between the first offer date and last decis
 julia> using Dates
 
 julia> pd = ProgramData(firstofferdate=Date("2021-02-11"), lastdecisiondate=Date("2021-04-15"))
-ProgramData(0, 0, 0, 0, Date("2021-02-11"), Date("2021-04-15"))
+ProgramData(0, 0, missing, -1, Date("2021-02-11"), Date("2021-04-15"))
 
 julia> normdate(Date("2021-02-11"), pd)
 0.0f0
@@ -39,6 +39,10 @@ function normdate(t::Date, pdata::ProgramData)
     # return clamp(Float32(nt), 0, 1)
 end
 normdate(t::Real, pdata) = t
+
+# For graduate programs, this is set nationally
+# https://cgsnet.org/april-15-resolution
+decisiondeadline(yr::Integer) = Date(yr, 4, 15)
 
 applicant_score(rank::Int, pdata) = rank / pdata.napplicants
 applicant_score(rank::Missing, pdata) = rank

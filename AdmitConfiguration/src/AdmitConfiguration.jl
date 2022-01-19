@@ -8,7 +8,7 @@ using Preferences
 using Requires
 
 # constants
-export program_lookups, program_abbreviations, program_range, program_substitutions, date_fmt
+export program_lookups, program_abbreviations, program_range, program_substitutions, date_fmt, column_configuration
 # utility functions
 export addprogram, delprogram, validateprogram
 export substitute, merge_program_range!
@@ -16,9 +16,9 @@ export todate, todate_or_missing
 # Preference-setting
 export set_programs, set_dsn, set_column_configuration, set_local_functions
 # SQL
-export connectdsn
-# Parsing
-export getaccept, getdecidedate
+export connectdsn, set_sql_queries
+# Parsing (local functions)
+export getaccept, getdecidedate, when_updated
 
 const suitedir = dirname(dirname(@__DIR__))
 const program_lookups = Dict{String,String}()
@@ -26,6 +26,7 @@ const program_abbreviations = Set{String}()
 const program_range = Dict{String,UnitRange{Int}}()
 const program_substitutions = Dict{String,Vector{String}}()
 const sql_dsn = Ref{String}()
+const sql_queries = Dict{String,String}()
 const date_fmt = Ref(dateformat"mm/dd/yyyy")
 const local_functions = Ref{Union{String,Nothing}}()
 const column_configuration = Dict{String,String}()
@@ -80,6 +81,22 @@ function set_dsn(name::AbstractString)
 end
 
 """
+    set_sql_queries(; applicants = "SELECT * FROM ...", programs = "SELECT * FROM ...")
+
+Configure the specific queries needed to obtain the applicants and program targets, respectively.
+"..." needs to be specified for your local institution.
+"""
+function set_sql_queries(; applicants=nothing, programs=nothing)
+    if applicants !== nothing
+        sql_queries["applicants"] = applicants
+    end
+    if programs !== nothing
+        sql_queries["programs"] = programs
+    end
+    @set_preferences!("sql_queries" => sql_queries)
+end
+
+"""
     set_local_functions(filename)
 
 Configure custom functions used in parsing applicant tables. The following functions must be implemented:
@@ -87,8 +104,14 @@ Configure custom functions used in parsing applicant tables. The following funct
 - [`getaccept`](@ref)
 - [`getdecidedate`](@ref)
 
+The following are optional and only required for certain functionality:
+
+- [`when_updated`](@ref)
+
 Create these functions and save them to a file somewhere permanent on your system.
 Then pass the filename to `set_local_functions` to register this file with AdmissionSuite.
+
+See also: [`set_column_configuration`](@ref).
 """
 function set_local_functions(str::AbstractString)
     filepath = abspath(str)
@@ -105,22 +128,35 @@ end
 Configure the names of columns `dbcolname`s in your database so that standard properties can be extracted.
 The properties that must be configured are:
 
+Applicant table columns:
+
 - "name": the name of the column that stores the applicant name
-- "program": the name of the column that stores the program the applicant is being considered for admission in
+- "app program": the name of the column that stores the name of the program the applicant is being considered for admission in
 - "offer date": the name of the column that stores the date at which an offer of admission was extended
-- "season" (optional): the name of the column that can be used to extract the application season (e.g., 2022)
+- "app season" (optional): the name of the column that can be used to extract the application season (e.g., 2022)
   if an offer date is not available for a candidate
+
+Program table columns:
+
+- "prog program": the name of the column that stores the program name
+- "prog season": the name of the column that can be used to extract the application season (e.g., 2022)
+- "slots": the name of the column that stores the matriculation target for a program
+- "napplicants" (optional): the name of the column that stores the number of applications received
+- "nmatriculants" (optional): the name of the column that stores the number of applicants who accepted the offer of admission
 
 # Example
 
 ```
-set_column_configuration("name" => "Applicant Name", "program" => "Program", "offer date" => "Acceptance Offered")
+set_column_configuration("name" => "Applicant Name", "app program" => "Program", "offer date" => "Acceptance Offered")
 ```
 sets up the names of three columns in your database tables.
+
+See also: [`set_local_functions`](@ref).
 """
 function set_column_configuration(pairs...)
     function rekey((key, val))
-        if key ∈ ("name", "program", "offer date", "season")
+        if key ∈ ("name", "app program", "offer date", "app season",
+                  "prog program", "prog season", "slots", "napplicants", "nmatriculants")
             isa(val, AbstractString) || error(key, " must be a string")
         else
             error("unrecognized key ", key)
@@ -128,7 +164,10 @@ function set_column_configuration(pairs...)
         return key => val
     end
     pairs = map(rekey, pairs)
-    @set_preferences!("column_configuration" => Dict(pairs))
+    for (key, val) in pairs
+        column_configuration[key] = val
+    end
+    @set_preferences!("column_configuration" => column_configuration)
 end
 
 function __init__()

@@ -53,3 +53,11 @@ end
 ```
 """
 function getdecidedate end
+
+"""
+    when_updated(row)
+
+Return date (or date and time) at which a record `row` was updated in the database.
+Required for de-duplicating database entries in `Admit.keep_final_records`.
+"""
+function when_updated end

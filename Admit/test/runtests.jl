@@ -4,6 +4,7 @@
 
 using Admit
 using Dates
+using CSV
 using DataFrames
 using Test
 
@@ -164,7 +165,7 @@ end
     end
 
     @testset "SQL table parsing" begin
-        df = Admit.CSV.File(joinpath(@__DIR__, "data", "sql_table.csv")) |> DataFrame
+        df = CSV.File(joinpath(@__DIR__, "data", "sql_applicant_table.csv")) |> DataFrame
         program_history = @test_logs (:warn, r"No first offer date identified for.*MGG.*PMB") Admit.extract_program_history(df)
         @test program_history[ProgramKey("MGG", 2021)].firstofferdate == typemax(Date)
         @test program_history[ProgramKey("MMMP", 2021)].firstofferdate == Date(2021, 2, 3)
@@ -432,3 +433,5 @@ end
         @test isa(tab, Admit.DashBase.Component)
     end
 end
+
+include("fakedb.jl")

@@ -38,17 +38,10 @@ jobs:
             ${{ runner.os }}-
       - uses: julia-actions/julia-buildpkg@v1
       # Configure the suite (this omits SQL connection configuration since this isn't available on CI)
-      - run: julia --project -e 'using AdmitConfiguration, CSV;
-                                 set_programs(joinpath(pkgdir(AdmitConfiguration), "examples", "WashU.csv"));
-                                 set_local_functions(joinpath(pkgdir(AdmitConfiguration), "examples", "local_functions_WashU.jl"));
-                                 set_column_configuration("name" => "Applicant", "program" => "Program", "season" => "Enroll Year", "offer date" => "Acceptance Offered");'
+      - run: julia --project -e 'using AdmissionSuite; include(joinpath(pkgdir(AdmitConfiguration), "examples", "fake_configure_WashU.jl"));'
       # To diagnose configuration issues
       - run: cat LocalPreferences.toml
-      # Run all tests
-      - run: julia --project -e 'using Pkg;
-                                 Pkg.test("AdmitConfiguration"; coverage=true);
-                                 Pkg.test("Admit"; coverage=true);
-                                 Pkg.test("AdmissionTargets"; coverage=true);'
+      - uses: julia-actions/julia-runtest@v1
       - uses: julia-actions/julia-processcoverage@v1
         with:
           directories: AdmitConfiguration/src,Admit/src,AdmissionTargets/src
