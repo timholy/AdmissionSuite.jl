@@ -14,3 +14,4 @@ ODBC = "be6f12e9-ca4f-5eb2-a339-a4f995cc0291"
 
 [compat]
 CSV = "0.9, 0.10"
+ODBC = "1"
