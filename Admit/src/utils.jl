@@ -18,7 +18,7 @@ Express `t` as a fraction of the gap between the first offer date and last decis
 julia> using Dates
 
 julia> pd = ProgramData(firstofferdate=Date("2021-02-11"), lastdecisiondate=Date("2021-04-15"))
-ProgramData(0, 0, 0, 0, Date("2021-02-11"), Date("2021-04-15"))
+ProgramData(0, 0, missing, -1, Date("2021-02-11"), Date("2021-04-15"))
 
 julia> normdate(Date("2021-02-11"), pd)
 0.0f0

@@ -111,7 +111,7 @@ The first argument is the number of applicants per program, the second the "numb
 
 You can also impose a minimum number of slots per program:
 
-```jldoctest targets
+```jldoctest targets; filter=r"@ AdmissionTargets .*AdmissionTargets"
 julia> tgts, parameters = targets(Dict("BBSB" => 86, "CSB" => 90, "EEPB" => 47, "MMMP" => 139), Dict(zip(programs, f)), 12, 2);
 ┌ Warning: The following programs 'earned' less than one slot (give them notice): ["CSB", "MMMP"]
 └ @ AdmissionTargets ~/.julia/dev/AdmissionSuite/AdmissionTargets/src/targets.jl:267
