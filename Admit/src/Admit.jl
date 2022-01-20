@@ -24,7 +24,7 @@ export normdate, aggregate, generate_fake_candidates
 # I/O
 export read_program_history, read_applicant_data, parse_database
 # Browser
-export manage_offers
+export manage_offers, runweb
 
 include("types.jl")
 include("utils.jl")

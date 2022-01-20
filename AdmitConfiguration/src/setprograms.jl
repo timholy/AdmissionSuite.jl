@@ -1,4 +1,5 @@
 function set_programs(filename::AbstractString; kwargs...)
+    isfile(filename) || error(filename, " not found")
     empty!(program_lookups)
     empty!(program_abbreviations)
     empty!(program_range)
@@ -34,4 +35,13 @@ function set_programs(filename::AbstractString; kwargs...)
                      "program_range" => Dict(name => Dict("start"=>first(rng), "stop"=>last(rng)) for (name, rng) in program_range),
                      "program_substitutions" => program_substitutions
                      )
+end
+
+function set_programs(; kwargs...)
+    filename = pick_file(; filterlist="csv")
+    if isempty(filename)
+        @info "Operation canceled"
+        return
+    end
+    set_programs(filename; kwargs...)
 end

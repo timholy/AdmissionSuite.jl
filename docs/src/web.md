@@ -1,7 +1,6 @@
 # Web application to manage the admissions season
 
-The web application can run locally on an ordinary laptop or desktop machine. It should have access to the database of applicant records (more on that below). Once the web application is running, type the URL into a browser window;
-if you're running the application on your local machine, this is just `http://localhost:8050`
+The web application can run locally on an ordinary laptop or desktop machine. It should be configured for your programs and have access to the database of applicant records and program history (see [AdmitConfiguration](@ref)). Once the web application is running, type the URL into a browser window; if you're running the application on your local machine, this is just `http://localhost:8050`
 
 Launching the webapp shows something like the following (fake applicant data were used for these screenshots):
 

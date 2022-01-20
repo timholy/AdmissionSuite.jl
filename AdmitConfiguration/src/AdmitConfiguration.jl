@@ -5,6 +5,7 @@ using UUIDs
 using Missings
 using ODBC
 using Preferences
+using NativeFileDialog
 using Requires
 
 # constants

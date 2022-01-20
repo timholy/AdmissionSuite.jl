@@ -14,6 +14,8 @@ ODBC = "be6f12e9-ca4f-5eb2-a339-a4f995cc0291"
 
 [compat]
 CSV = "0.9, 0.10"
+MariaDB_Connector_C_jll = "3"
+MariaDB_Connector_ODBC_jll = "3"
 ODBC = "1"
 
 [extras]
