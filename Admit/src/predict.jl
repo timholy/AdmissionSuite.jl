@@ -13,9 +13,10 @@ function matriculation_probability(likelihood, past_applicants)
     axes(likelihood) == axes(past_applicants) || throw(DimensionMismatch("axes of `likelihood` and `past_applicants` must agree"))
     lyes = lno = zero(eltype(likelihood))
     for (l, app) in zip(likelihood, past_applicants)
-        if ismissing(app.accept)
+        acc = app.accept
+        if acc === missing
             error("past applicants must all be decided")
-        elseif app.accept
+        elseif acc
             lyes += l
         else
             lno += l
@@ -71,12 +72,12 @@ Compute the estimated number `nmatric` of matriculants and the program-specific 
 The arguments are similarly to [`match_likelihood`](@ref). If you're doing a post-hoc analysis, `actual_yield` can be a
 `Dict(progname => nmatric)`, in which case the p-value for the observed outcome will also be stored in `progstatus`.
 """
-function wait_list_analysis(fmatch::Function,
+function wait_list_analysis(fmatch::F,
                             past_applicants::AbstractVector{NormalizedApplicant},
                             applicants::AbstractVector{NormalizedApplicant},
                             tnow::Union{Date,Real};
                             program_history,
-                            actual_yield=nothing)
+                            actual_yield=nothing) where F
     yr = season(only(unique(season, applicants)))
     progyields = Dict{String,ProgramYieldPrediction}()
     nmatric = 0.0f0 ± 0.0f0
@@ -85,21 +86,23 @@ function wait_list_analysis(fmatch::Function,
         progname = progkey.program
         ntnow = isa(tnow, Date) ? normdate(tnow, progdata) : tnow
         # Select applicants to this program who already have an offer
-        papplicants = filter(app -> app.program == progname && !ismissing(app.normofferdate) && app.normofferdate <= ntnow, applicants)
+        papplicants = filter(app -> app.program == progname && !ismissing(app.normofferdate) && app.normofferdate::Float32 <= ntnow, applicants)
         ppmatrics = map(papplicants) do applicant
-            if !ismissing(applicant.normdecidedate)
-                applicant.normdecidedate <= ntnow && return Float32(applicant.accept)
+            ndd = applicant.normdecidedate
+            if !ismissing(ndd)
+                ndd <= ntnow && return Float32(applicant.accept::Bool)
             end
             like = match_likelihood(fmatch, past_applicants, applicant, ntnow)
             return matriculation_probability(like, past_applicants)
         end
         pnmatric = sum(ppmatrics)
         simnmatric = run_simulation(ppmatrics, 10^4)
-        estmatric = round(mean(simnmatric); digits=1) ± round(std(simnmatric); digits=1)
+        nmean = Float32(mean(simnmatric))
+        estmatric = round(nmean; digits=1) ± round(Float32(std(simnmatric; mean=nmean)); digits=1)
         progtarget = progdata.target_corrected
         poutcome = missing
         if actual_yield !== nothing
-            wlapplicants = filter(app -> app.program == progname && app.normofferdate > ntnow, applicants)
+            wlapplicants = filter(app -> app.program == progname && !ismissing(app.normofferdate) && app.normofferdate::Float32 > ntnow, applicants)
             for applicant in wlapplicants
                 like = match_likelihood(fmatch, past_applicants, applicant, ntnow)
                 push!(ppmatrics, matriculation_probability(like, past_applicants))
@@ -138,7 +141,8 @@ function add_offers!(fmatch::Function,
                      program_history)
     function calc_pmatric(applicant, pd = program_history[ProgramKey(applicant)])
         ntnow = normdate(tnow, pd)
-        applicant.normdecidedate !== missing && applicant.normdecidedate <= ntnow && return Float32(applicant.accept)
+        ndd = applicant.normdecidedate
+        ndd !== missing && ndd <= ntnow && return Float32(applicant.accept::Bool)
         like = match_likelihood(fmatch, past_applicants, applicant, ntnow)
         return matriculation_probability(like, past_applicants)
     end
@@ -153,7 +157,9 @@ function add_offers!(fmatch::Function,
     allpmatrics = Float32[]
     for (program, list) in program_offers
         pd = program_history[ProgramKey(program, _season)]
-        pmatrics = calc_pmatric.(list, (pd,))
+        pmatrics = map(list) do app
+            calc_pmatric(app, pd)
+        end
         ppmatrics[program] = pmatrics
         append!(allpmatrics, pmatrics)
     end
@@ -213,10 +219,10 @@ end
 
 ## Model training
 
-function collect_predictions!(fmatch::Function, pmatrics::AbstractVector, accepts::AbstractVector{Bool};
+function collect_predictions!(fmatch::F, pmatrics::AbstractVector, accepts::AbstractVector{Bool};
                               applicants, past_applicants,
                               ptail=0.0f0,
-                              #= fraction of prior applicants that must match =# minfrac=0.01)
+                              #= fraction of prior applicants that must match =# minfrac=0.01) where F
     nviolations = 0
     for applicant in applicants
         like = match_likelihood(fmatch, past_applicants, applicant, 0.0f0)
@@ -224,7 +230,7 @@ function collect_predictions!(fmatch::Function, pmatrics::AbstractVector, accept
         p = matriculation_probability(like, past_applicants)
         p = clamp(p, ptail, 1-ptail)
         push!(pmatrics, p)
-        push!(accepts, applicant.accept)
+        push!(accepts, applicant.accept::Bool)
     end
     return nviolations
 end

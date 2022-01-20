@@ -215,13 +215,15 @@ function render_program_zoom(fmatch::Function,
                              pd::ProgramData,
                              prog::AbstractString)
     function calc_pmatric(applicant)  # TODO? copied from add_offers!, would be better not to copy but it's a closure...
-        applicant.normdecidedate !== missing && applicant.normdecidedate <= ntnow && return Float32(applicant.accept)
+        ndd = applicant.normdecidedate
+        ndd !== missing && ndd <= ntnow && return Float32(applicant.accept::Bool)
         like = match_likelihood(fmatch, past_applicants, applicant, ntnow)
         return matriculation_probability(like, past_applicants)
     end
     function pending_row(app)
         name = app.applicantdata.name
-        if app.normofferdate !== missing && app.normofferdate <= ntnow
+        nod = app.normofferdate
+        if nod !== missing && nod <= ntnow
             name = html_b(name)
         end
         return [html_td(name), html_td(round(calc_pmatric(app); digits=2))]
@@ -247,12 +249,13 @@ function render_program_zoom(fmatch::Function,
     update_range((_min, _max), x) = (min(_min, x), max(_max, x))
     for app in past_applicants
         app.program == prog || continue
-        isa(app.normdecidedate, Real) || continue
+        ndd = app.normdecidedate
+        isa(ndd, Real) || continue
         if app.accept === true
-            push!(yes, app.normdecidedate)
+            push!(yes, ndd)
             seasonrange = update_range(seasonrange, app.season)
         elseif app.accept === false
-            push!(no, app.normdecidedate)
+            push!(no, ndd)
             seasonrange = update_range(seasonrange, app.season)
         end
     end
@@ -304,21 +307,23 @@ function render_tab_initial(fmatch::Function,
     colnames = ["Program", "Target", "# potential offers", "# initial offers"]
     prognames = sort(collect(keys(init_offers_by_prog)))
     tbl = dbc_table([
-        html_thead(html_tr([html_th(col) for col in colnames])),
-        html_tbody(vcat([
-            html_tr([html_td(prog),
-                     html_td(program_history[ProgramKey(prog, _season)].target_corrected),
-                     html_td(nwl[prog]),
-                     html_td(noffers[prog]),
-                ]) for prog in prognames
-            ],
-            html_tr([
-                html_td("Total"),
-                html_td(target),
-                html_td(string(npool)),
-                html_td(string(nmatrici))
-                ]))),
-        ]; hover=true, style=Dict("width"=>"auto"))
+                     html_thead(html_tr([html_th(col) for col in colnames])),
+                     html_tbody(vcat([
+                                      html_tr([html_td(prog),
+                                              html_td(program_history[ProgramKey(prog, _season)].target_corrected),
+                                              html_td(nwl[prog]),
+                                              html_td(noffers[prog]),
+                                          ]) for prog in prognames
+                                     ],
+                                     [html_tr([
+                                         html_td("Total"),
+                                         html_td(target),
+                                         html_td(string(npool)),
+                                         html_td(string(nmatrici))
+                                         ])]
+                                     ),
+                     )
+                    ]; hover=true, style=Dict("width"=>"auto"))
 
     # The overall layout
     return dbc_card(
@@ -348,7 +353,8 @@ function render_internals(fmatch::Function,
         nsim = Float64[]
         ntnow = normdate(tnow, program_history[ProgramKey(program=prog, season=_season)])
         for app in applicants
-            app.program == prog && (ismissing(app.normdecidedate) || app.normdecidedate > ntnow) || continue
+            ndd = app.normdecidedate
+            app.program == prog && (ismissing(ndd) || ndd > ntnow) || continue
             push!(nsim, sum(pastapp->fmatch(app, pastapp, ntnow), past_applicants))
         end
         nmatches[prog] = round(mean(nsim); digits=1) ± round(std(nsim); digits=1)
@@ -406,7 +412,8 @@ function recommend(fmatch::Function,
             pd = program_history[ProgramKey(app)]
         end
         ntnow = normdate(tnow, pd)
-        if !ismissing(app.normofferdate) && app.normofferdate <= ntnow
+        nod = app.normofferdate
+        if !ismissing(nod) && nod <= ntnow
             push!(program_offers[cprog], app)
         else
             push!(program_candidates[cprog], app)

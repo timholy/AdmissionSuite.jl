@@ -47,6 +47,7 @@ function offerdata(applicants, program_history)
 end
 
 addoutcome(count::Outcome, accept::Bool) = Outcome(count.ndeclines + !accept, count.naccepts + accept)
+addoutcome(count::Outcome, accept::Missing) = count
 function addoutcome!(outcomes, applicant)
     key = makekey(outcomes, ProgramKey(applicant))
     count = get(outcomes, key, myzero(valtype(outcomes)))
@@ -54,7 +55,8 @@ function addoutcome!(outcomes, applicant)
         outcomes[key] = addoutcome(count, applicant.accept)
     else
         N = length(count)
-        j = max(1, ceil(Int, N * (ismissing(applicant.normdecidedate) ? 1.0f0 : applicant.normdecidedate)))
+        ndd = applicant.normdecidedate
+        j = max(1, ceil(Int, N * (ismissing(ndd) ? 1.0f0 : ndd)))
         newcount = ntuple(i -> i == j ? addoutcome(count[i], applicant.accept) : count[i], N)
         outcomes[key] = newcount
     end
@@ -158,19 +160,21 @@ a decision by `tnow`.
 
 See also: [`match_function`](@ref), [`select_applicant`](@ref).
 """
-function match_likelihood(fmatch::Function,
+function match_likelihood(fmatch::F,
                           past_applicants::AbstractVector{NormalizedApplicant},
                           applicant::NormalizedApplicant,
-                          tnow::Real)
-    return [fmatch(applicant, app, tnow) for app in past_applicants]
+                          tnow::Float32) where F
+    return [Float32(fmatch(applicant, app, tnow))::Float32 for app in past_applicants]
 end
+match_likelihood(fmatch, past_applicants::AbstractVector{NormalizedApplicant}, applicant::NormalizedApplicant, tnow::Real) =
+    match_likelihood(fmatch, past_applicants, applicant, Float32(tnow)::Float32)
 
 """
     likelihood = match_likelihood(fmatch, past_applicants, applicant, tnow::Date; program_history)
 
 Use this format if supplying `tnow` in `Date` format.
 """
-function match_likelihood(fmatch::Function,
+function match_likelihood(fmatch,
                           past_applicants::AbstractVector{NormalizedApplicant},
                           applicant::NormalizedApplicant,
                           tnow::Date;
@@ -202,10 +206,11 @@ function match_function(; σr=Inf32, σt=Inf32, progsim=default_similarity)
     σt = convert(Union{Float32,Missing}, σt)
     return function(template::NormalizedApplicant, applicant::NormalizedApplicant, tnow::Union{Real,Missing})
         # Include only applicants that hadn't decided by tnow
-        !ismissing(tnow) && !ismissing(applicant.normdecidedate) && tnow > applicant.normdecidedate && return 0.0f0
+        ndd = applicant.normdecidedate
+        !ismissing(tnow) && !ismissing(ndd) && tnow > ndd && return 0.0f0
         progcoef = progsim(template.program, applicant.program)
-        rankpenalty = coalesce((template.normrank - applicant.normrank)/σr, 0.0f0)^2
-        offerdatepenalty = coalesce((template.normofferdate - applicant.normofferdate)/σt, 0.0f0)^2
+        rankpenalty = (coalesce((template.normrank - applicant.normrank)/σr, 0.0f0)^2)::Float32
+        offerdatepenalty = (coalesce((template.normofferdate - applicant.normofferdate)/σt, 0.0f0)^2)::Float32
         return progcoef * exp(-rankpenalty/2 - offerdatepenalty/2)
     end
 end

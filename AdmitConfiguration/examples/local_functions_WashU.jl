@@ -1,5 +1,6 @@
-function getaccept(row)
-    choice = row."Final Outcome"
+getaccept(row) = getaccept(row."Final Outcome")
+getaccept(::Missing) = missing
+function getaccept(choice::AbstractString)
     if choice ∈ ("Class Member", "Deferred")
         return true
     elseif choice ∈ ("Declined", "Interviewed, Reject", "Withdrew Following Interview")
