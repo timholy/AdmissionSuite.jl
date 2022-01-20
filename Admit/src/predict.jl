@@ -85,7 +85,7 @@ function wait_list_analysis(fmatch::Function,
         progname = progkey.program
         ntnow = isa(tnow, Date) ? normdate(tnow, progdata) : tnow
         # Select applicants to this program who already have an offer
-        papplicants = filter(app -> app.program == progname && app.normofferdate <= ntnow, applicants)
+        papplicants = filter(app -> app.program == progname && !ismissing(app.normofferdate) && app.normofferdate <= ntnow, applicants)
         ppmatrics = map(papplicants) do applicant
             if !ismissing(applicant.normdecidedate)
                 applicant.normdecidedate <= ntnow && return Float32(applicant.accept)

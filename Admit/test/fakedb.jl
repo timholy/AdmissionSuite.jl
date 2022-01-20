@@ -1,6 +1,9 @@
 using Admit
+using Admit.CSV
 using DataFrames
 using DBInterface
+using Dates
+using Test
 
 struct FakeConn
     applicants::DataFrame
@@ -37,7 +40,7 @@ DBInterface.execute(conn::FakeConn, tablename::String) =
         end
 
         getapplicant(apps, name) = apps[findfirst(app->app.name==name, apps)]
-        @test length(applicants) == 4
+        @test length(applicants) == 8
         for (name, prog, nod, accept, dd) in zip(("Last1, First1", "Last2, First2", "Last3, First3", "Last4, First4"),
                                                 ("MGG", "MMMP", "NS", "PMB"),
                                                 (missing, 0.0f0, 0.0f0, missing),
@@ -54,6 +57,12 @@ DBInterface.execute(conn::FakeConn, tablename::String) =
                 fod = program_history[ProgramKey(prog, 2021)].firstofferdate
                 @test app.normdecidedate == Float32((dd - fod)/(Date(2021, 4, 15) - fod))
             end
+        end
+
+        @async runweb(conn; deduplicate=true, tnow=Date(2021, 2, 28))
+        if isinteractive()
+            sleep(0.2)
+            Base.prompt("hit enter to finish the tests")
         end
     finally
         # Restore the original column_configuration and sql_queries

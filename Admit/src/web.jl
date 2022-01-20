@@ -3,8 +3,40 @@
 using Dash
 using DashBootstrapComponents
 
+get_tnow(tnow) = isa(tnow, Date) ? tnow : tnow()
+
+function runweb(conn; deduplicate::Bool=false, tnow=today, kwargs...)
+    local applicants, program_history
+    refresh = Ref(true)
+    function fetch_all()
+        if refresh[]
+            applicants, program_history = parse_database(conn; deduplicate)
+            refresh[] = false
+        end
+    end
+    function fetch_past_applicants()
+        fetch_all()
+        return filter(applicants) do app
+            app.season < season(get_tnow(tnow)) && !ismissing(app.accept)
+        end
+    end
+    function fetch_applicants()
+        fetch_all()
+        return filter(applicants) do app
+            app.season == season(get_tnow(tnow))
+        end
+    end
+    function fetch_program_data()
+        fetch_all()
+        return program_history
+    end
+    app = manage_offers(fetch_past_applicants, fetch_applicants, fetch_program_data, tnow; kwargs...)
+    run_server(app, "0.0.0.0", debug=true)
+end
+
 """
-    app = manage_offers(fetch_past_applicants::Function, fetch_applicants::Function, fetch_program_data::Function, tnow::Union{Date,Function}=today; σthresh::Real=2;
+    app = manage_offers(fetch_past_applicants::Function, fetch_applicants::Function, fetch_program_data::Function, tnow::Union{Date,Function}=today;
+                        σthresh::Real=2,
                         σsel=0.2f0, σyield=1.0f0, σr=0.5f0, σt=Inf32)
 
 Create a report about the current state of admissions. The report has 3 tabs:
@@ -40,9 +72,7 @@ Admit.run_server(app, "0.0.0.0", debug=true)
 ```
 """
 function manage_offers(fetch_past_applicants::Function, fetch_applicants::Function, fetch_program_data::Function, tnow::Union{Date,Function}=today();
-                       σthresh=2, σsel=0.2f0, σyield=1.0f0, σr=0.5f0, σt=Inf32)
-    get_tnow(tnow) = isa(tnow, Date) ? tnow : tnow()
-
+                       σthresh=2, σsel=0.2f0, σyield=1.0f0, σr=0.5f0, σt=Inf32, refresh=Ref(false))
     past_applicants = fetch_past_applicants()
     program_history = fetch_program_data()
     offerdat = offerdata(past_applicants, program_history)
@@ -110,6 +140,7 @@ function manage_offers(fetch_past_applicants::Function, fetch_applicants::Functi
 
     # Refresh callback
     callback!(app, Output("hidden-div", "children"), Input("refresh-button", "n_clicks")) do n
+        refresh[] = true
         applicants[] = fetch_applicants()
         return nothing
     end
@@ -375,7 +406,7 @@ function recommend(fmatch::Function,
             pd = program_history[ProgramKey(app)]
         end
         ntnow = normdate(tnow, pd)
-        if app.normofferdate <= ntnow
+        if !ismissing(app.normofferdate) && app.normofferdate <= ntnow
             push!(program_offers[cprog], app)
         else
             push!(program_candidates[cprog], app)
