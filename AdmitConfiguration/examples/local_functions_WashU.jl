@@ -1,4 +1,4 @@
-getaccept(row) = getaccept(row."Final Outcome")
+getaccept(row) = getaccept(row."Current/Final Stage")
 getaccept(::Missing) = missing
 function getaccept(choice::AbstractString)
     if choice ∈ ("Class Member", "Deferred")
