@@ -66,6 +66,7 @@ todate(dt::DateTime) = Date(dt)
 todate(datestr::AbstractString) = Date(datestr, date_fmt[])
 
 function todate_or_missing(d)
+    isa(d, AbstractString) && isempty(d) && return missing
     dp = tryparse(Date, d, date_fmt[])
     return dp === nothing ? missing : dp
 end
