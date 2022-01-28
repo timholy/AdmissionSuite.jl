@@ -1,4 +1,4 @@
-enrollment_year,program_interest,Applicant,Stage Date,Interview Date,Final Outcome,"Interviewed, Hold","Interviewed, High Hold",Accept Offered Date,Class Member Date,Declined Date,Deferred,"Interviewed, Reject",Withdrew Following Interview
+enrollment_year,program_interest,Applicant,Stage Date,Interview Date,"Current/Final Stage","Interviewed, Hold","Interviewed, High Hold",Acceptance Offered Date,Class Member Date,Declined Date,Deferred,"Interviewed, Reject",Withdrew Following Interview
 2020,Molecular Genetics and Genomics,"Last1a, First1",,01/04/2020,Withdrew Following Interview,02/10/2020,,,,,,,03/17/2020
 2020,Molecular Microbiology and Microbial Pathogenesis,"Last2a, First2",,01/29/2020,Declined,,,02/03/2020,,03/03/2020,,,
 2020,Neurosciences,"Last3a, First3",2020-04-01T10:08:22,02/05/2020,Class Member,,,02/10/2020,04/01/2020,,,,
