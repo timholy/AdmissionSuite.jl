@@ -165,7 +165,7 @@ function extract_program_history(applicants::DataFrame, program_metadata=DummyMe
     # Add in any programs that have not yet made an offer in the current year
     for (pk, meta) in program_metadata
         if !haskey(out, pk)
-            out[pk] = programdata(pk.season; meta...)
+            out[pk] = programdata(typemax(Date); meta...)
         end
     end
     return out
