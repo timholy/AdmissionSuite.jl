@@ -202,6 +202,10 @@ function loadprefs()
     if cc !== nothing
         merge!(column_configuration, cc)
     end
+    sq = @load_preference("sql_queries")
+    if sq !== nothing
+	merge!(sql_queries, sq)
+    end
 
     if !onloadpath
         pop!(LOAD_PATH)
