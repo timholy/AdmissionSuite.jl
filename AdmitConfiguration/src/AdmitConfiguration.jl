@@ -28,7 +28,7 @@ const program_range = Dict{String,UnitRange{Int}}()
 const program_substitutions = Dict{String,Vector{String}}()
 const sql_dsn = Ref{String}()
 const sql_queries = Dict{String,String}()
-const date_fmt = Ref(dateformat"mm/dd/yyyy")
+const date_fmt = Ref{DateFormat}(dateformat"mm/dd/yyyy")
 const local_functions = Ref{Union{String,Nothing}}()
 const column_configuration = Dict{String,String}()
 

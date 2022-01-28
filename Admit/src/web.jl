@@ -82,7 +82,7 @@ function manage_offers(fetch_past_applicants::Function, fetch_applicants::Functi
     _season = season(get_tnow(tnow))
 
     applicants = Ref(fetch_applicants())
-    progs = sort(unique(app.program for app in applicants[]))
+    progs = sort(unique(pk.program for (pk, _) in program_history if pk.season == season(get_tnow(tnow))))
     target = compute_target(program_history, _season)
 
     target_input = dcc_input(id="total-target", value=compute_target(program_history, season(get_tnow(tnow))), type="number")
@@ -166,7 +166,7 @@ function render_tab_summary(fmatch::Function,
         html_tbody([
             html_tr([html_td(prog),
                     html_td(program_history[ProgramKey(prog, _season)].target_corrected),
-                    html_td(string(prog_projections[prog].nmatriculants)),
+                    html_td(haskey(prog_projections, prog) ? string(prog_projections[prog].nmatriculants) : "NaN"),
                     html_td(prog_status[prog][2].naccepts),
                     html_td(prog_status[prog][2].ndeclines),
                     html_td(prog_status[prog][1] - total(prog_status[prog][2])),
@@ -260,6 +260,23 @@ function render_program_zoom(fmatch::Function,
         end
     end
 
+    if pd.firstofferdate <= tnow
+        timing_graph = dcc_graph(
+            id = "timing",
+            figure = (
+                data = [
+                    (x = yes, type = "histogram", name = "accept"),
+                    (x = no,  type = "histogram", name = "decline"),
+                    #= FIXME: vertical line does not naturally span the y-domain =#
+                    (xref = "x", yref = "y domain", x = [ntnow, ntnow], y = [0.0, 10.0], type = "line", line = (dash = "dash", width = 3), name = "today"),
+                ],
+                layout = (title = "Decision timing ($(seasonrange[1])-$(seasonrange[2]))", xaxis = (title = "Normalized date",)),
+            )
+        )
+    else
+        timing_graph = html_div("Timing graph not available (first offer has not yet been made)")
+    end
+
     return dbc_card(
         dbc_cardbody([
             html_h2("Accepted:"),
@@ -275,18 +292,7 @@ function render_program_zoom(fmatch::Function,
                 html_tbody([html_tr(pending_row(app)) for app in undecided]),
             ]; hover=true, style=Dict("width"=>"auto")),
             html_br(),
-            dcc_graph(
-                id = "timing",
-                figure = (
-                    data = [
-                        (x = yes, type = "histogram", name = "accept"),
-                        (x = no,  type = "histogram", name = "decline"),
-                        #= FIXME: vertical line does not naturally span the y-domain =#
-                        (xref = "x", yref = "y domain", x = [ntnow, ntnow], y = [0.0, 10.0], type = "line", line = (dash = "dash", width = 3), name = "today"),
-                    ],
-                    layout = (title = "Decision timing ($(seasonrange[1])-$(seasonrange[2]))", xaxis = (title = "Normalized date",)),
-                )
-            )
+            timing_graph,
         ])
     )
 end
@@ -395,7 +401,7 @@ function recommend(fmatch::Function,
                    tnow::Date,
                    σthresh::Real;
                    program_history)
-    progs = unique(app.program for app in applicants)
+    progs = unique(pk.program for (pk, _) in program_history if pk.season == season(tnow))
     _, prog_projection = wait_list_analysis(fmatch, past_applicants, applicants, tnow; program_history)
 
     # Divide the applicants into those with offers and those not yet offered a slot

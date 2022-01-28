@@ -8,11 +8,11 @@ set_column_configuration(# Applicant table
                          "name" => "Applicant",
                          "app program" => "program_interest",
                          "app season" => "enrollment_year",
-                         "offer date" => "Accept Offered Date",
+                         "offer date" => "Acceptance Offered Date",
                          # Program table
                          "prog program" => "program_interest",
-                         "prog season" => "year",
+                         "prog season" => "enrollment_year",
                          "slots" => "Matric Target",
-                         # napplicants not present
+                         "napplicants" => "Total Applicants",
                          # nmatriculants not present
 )

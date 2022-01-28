@@ -69,7 +69,11 @@ end
 
 function parse_applicant_row(row, column_configuration)
     name = getproperty(row, column_configuration["name"])
-    prog = validateprogram(getproperty(row, column_configuration["app program"]))
+    prog = try
+        validateprogram(getproperty(row, column_configuration["app program"]))
+    catch
+        return name
+    end
     offerdate = todate_or_missing(getproperty(row, column_configuration["offer date"]))
     if !ismissing(offerdate)
         accept = getaccept(row)
@@ -80,9 +84,18 @@ function parse_applicant_row(row, column_configuration)
 end
 
 function parse_program_row(row, column_configuration)
-    prog = validateprogram(getproperty(row, column_configuration["prog program"]))
+    prog = try
+        validateprogram(getproperty(row, column_configuration["prog program"]))
+    catch
+        return nothing
+    end
     _season = getproperty(row, column_configuration["prog season"])
-    slots = getproperty(row, column_configuration["slots"])
+
+    slots = -1
+    slotscol = get(column_configuration, "slots", nothing)
+    if slotscol !== nothing && haskey(row, slotscol)
+        slots = getproperty(row, slotscol)
+    end
 
     napplicants = -1
     nappcol = get(column_configuration, "napplicants", nothing)
@@ -108,12 +121,13 @@ Extract program metadata:
 - total number of matriculants (i.e., number who accepted the offer of admission)
 """
 function parse_programs(programs::DataFrame)
-    return Dict(parse_program_row(row, AdmitConfiguration.column_configuration) for row in eachrow(programs))
+    return Dict(Iterators.filter(!=(nothing), parse_program_row(row, AdmitConfiguration.column_configuration) for row in eachrow(programs)))
 end
 
 struct DummyMetadata end
 Base.getindex(::DummyMetadata, pk::ProgramKey) = ()
 Base.get(::DummyMetadata, pk::ProgramKey, val) = val
+Base.iterate(::DummyMetadata) = nothing
 
 """
     program_history = extract_program_history(applicants)
@@ -147,11 +161,20 @@ function extract_program_history(applicants::DataFrame, program_metadata=DummyMe
         sort!(keys_with_sentinel)
         @warn "No first offer date identified for $keys_with_sentinel"
     end
-    return Dict(pk => programdata(fo; get(program_metadata, pk, ())...) for (pk, fo) in firstoffer)
+    out = Dict(pk => programdata(fo; get(program_metadata, pk, ())...) for (pk, fo) in firstoffer)
+    # Add in any programs that have not yet made an offer in the current year
+    for (pk, meta) in program_metadata
+        if !haskey(out, pk)
+            out[pk] = programdata(pk.season; meta...)
+        end
+    end
+    return out
 end
 
 programdata(firstofferdate::Date; lastdecisiondate=decisiondeadline(season(firstofferdate)), kwargs...) =
     ProgramData(; firstofferdate, lastdecisiondate, kwargs...)
+programdata(season::Integer; lastdecisiondate=decisiondeadline(season), kwargs...) =
+    ProgramData(; lastdecisiondate, kwargs...)
 
 function parse_applicants(applicants::DataFrame, program_history)
     napplicants = NormalizedApplicant[]
