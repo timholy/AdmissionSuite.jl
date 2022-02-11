@@ -30,7 +30,7 @@ function runweb(conn; deduplicate::Bool=false, tnow=today, kwargs...)
         fetch_all()
         return program_history
     end
-    app = manage_offers(fetch_past_applicants, fetch_applicants, fetch_program_data, tnow; kwargs...)
+    app = manage_offers(fetch_past_applicants, fetch_applicants, fetch_program_data, tnow; refresh=refresh, kwargs...)
     run_server(app, "0.0.0.0", debug=true)
 end
 
