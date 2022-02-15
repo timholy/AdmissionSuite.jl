@@ -26,7 +26,6 @@ using Test
         set_programs(simple; force=true)
         AdmitConfiguration.loadprefs()
         @test "ProgA" ∈ program_abbreviations
-        @test "EEPB" ∉ program_abbreviations
     finally
         rm(lp; force=true)
         if isf

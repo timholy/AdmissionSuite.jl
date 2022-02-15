@@ -178,9 +178,11 @@ function __init__()
 end
 
 function loadprefs()
-    onloadpath = suitedir ∈ LOAD_PATH
-    if !onloadpath
-        push!(LOAD_PATH, suitedir)
+    @static if Base.VERSION < v"1.8.0-DEV.1515"
+        onloadpath = suitedir ∈ LOAD_PATH
+        if !onloadpath
+            push!(LOAD_PATH, suitedir)
+        end
     end
 
     plook = @load_preference("program_lookups")
@@ -207,8 +209,10 @@ function loadprefs()
 	merge!(sql_queries, sq)
     end
 
-    if !onloadpath
-        pop!(LOAD_PATH)
+    @static if Base.VERSION < v"1.8.0-DEV.1515"
+        if !onloadpath
+            pop!(LOAD_PATH)
+        end
     end
     return nothing
 end
