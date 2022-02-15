@@ -1,7 +1,11 @@
 # This is a partial configuration (omitting some details of the SQL configuration, see `set_sql_queries` and `set_dsn`)
 # It is used for some of the tests
-using AdmitConfiguration
-using CSV
+if isdefined(@__MODULE__, :AdmissionSuite)
+    using AdmissionSuite.AdmitConfiguration
+else
+    using AdmitConfiguration
+    using CSV
+end
 set_programs(joinpath(@__DIR__, "WashU.csv"))
 set_local_functions(joinpath(@__DIR__, "local_functions_WashU.jl"))
 set_column_configuration(# Applicant table
