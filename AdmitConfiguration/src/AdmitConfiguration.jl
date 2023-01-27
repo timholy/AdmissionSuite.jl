@@ -15,7 +15,7 @@ export addprogram, delprogram, validateprogram
 export substitute, merge_program_range!
 export todate, todate_or_missing
 # Preference-setting
-export set_programs, set_dsn, set_column_configuration, set_local_functions
+export set_programs, set_dsn, set_column_configuration, set_local_functions, set_date_format
 # SQL
 export connectdsn, set_sql_queries
 # Parsing (local functions)
@@ -28,7 +28,7 @@ const program_range = Dict{String,UnitRange{Int}}()
 const program_substitutions = Dict{String,Vector{String}}()
 const sql_dsn = Ref{String}()
 const sql_queries = Dict{String,String}()
-const date_fmt = Ref{DateFormat}(dateformat"mm/dd/yyyy")
+const date_fmt = Ref{DateFormat}(DateFormat(@load_preference("date_format", "mm/dd/yyyy")))
 const local_functions = Ref{Union{String,Nothing}}()
 const column_configuration = Dict{String,String}()
 
@@ -172,6 +172,21 @@ function set_column_configuration(pairs...)
     end
     @set_preferences!("column_configuration" => column_configuration)
 end
+
+"""
+    set_date_format(fmt::AbstractString)
+
+Specify how dates are represented. The default is `"mm/dd/yyyy"`.
+
+# Examples
+
+```
+julia> set_date_format("y-m-d H:M:S.s")
+```
+
+to set a format that includes the time as well as date.
+"""
+set_date_format(fmt::AbstractString) = @set_preferences!("date_format" => fmt)
 
 function __init__()
     @require CSV = "336ed68f-0bac-5ca0-87d4-7b16caf5d00b" include("setprograms.jl")

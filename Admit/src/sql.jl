@@ -78,7 +78,8 @@ function parse_applicant_row(row, column_configuration)
     if !ismissing(offerdate)
         accept = getaccept(row)
         choicedate = getdecidedate(row)
-        rank = getproperty(row, column_configuration["rank"])
+        rankcol = get(column_configuration, "rank", missing)
+        rank = rankcol === missing || !haskey(row, rankcol) ? missing : getproperty(row, rankcol)
         return name, prog, offerdate, accept, choicedate, rank
     end
     return name, prog, getproperty(row, column_configuration["app season"])
