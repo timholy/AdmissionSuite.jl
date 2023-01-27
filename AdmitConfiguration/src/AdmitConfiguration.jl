@@ -136,6 +136,8 @@ Applicant table columns:
 - "offer date": the name of the column that stores the date at which an offer of admission was extended
 - "app season" (optional): the name of the column that can be used to extract the application season (e.g., 2022)
   if an offer date is not available for a candidate
+- "rank" (optional): the applicant rank assigned by the admissions committee/interviewers. From highest (top-rated) to lowest,
+  they should be numbered 1, 2, 3, ... Each program should have separate ranking.
 
 Program table columns:
 
@@ -156,7 +158,7 @@ See also: [`set_local_functions`](@ref).
 """
 function set_column_configuration(pairs...)
     function rekey((key, val))
-        if key ∈ ("name", "app program", "offer date", "app season",
+        if key ∈ ("name", "app program", "offer date", "app season", "rank",
                   "prog program", "prog season", "slots", "napplicants", "nmatriculants")
             isa(val, AbstractString) || error(key, " must be a string")
         else
@@ -206,7 +208,7 @@ function loadprefs()
     end
     sq = @load_preference("sql_queries")
     if sq !== nothing
-	merge!(sql_queries, sq)
+	    merge!(sql_queries, sq)
     end
 
     @static if Base.VERSION < v"1.8.0-DEV.1515"

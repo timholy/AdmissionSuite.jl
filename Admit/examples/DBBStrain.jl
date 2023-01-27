@@ -2,8 +2,8 @@ include("train.jl")
 
 ## Tune the matching function
 lastyear = maximum(pk -> pk.season, keys(program_history))
-test_applicants = filter(app->app.season == lastyear, applicants)
-past_applicants = filter(app->app.season < lastyear, applicants)
+test_applicants = filter(app->app.season == lastyear  && isa(app.normdecidedate, Real), applicants)
+past_applicants = filter(app->app.season < lastyear && isa(app.normdecidedate, Real), applicants)
 
 # First train without access to individual data (program-only data)
 corarray_pg = match_correlation(σsels, σyields, [Inf32], [Inf32]; applicants=past_applicants, program_history)
