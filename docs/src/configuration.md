@@ -161,6 +161,10 @@ where you might need to reference multiple columns in order to extract a particu
 
 "By name" configuration is done with [`set_column_configuration`](@ref); see its documentation for details.
 
+### Date formats
+
+Configure Admit for the specific way you represent dates with [`set_date_format`](@ref).
+
 ### "Custom function" configuration
 
 These require that you write a few Julia functions and save them to a file. You then register these functions

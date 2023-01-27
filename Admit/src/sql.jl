@@ -78,7 +78,9 @@ function parse_applicant_row(row, column_configuration)
     if !ismissing(offerdate)
         accept = getaccept(row)
         choicedate = getdecidedate(row)
-        return name, prog, offerdate, accept, choicedate
+        rankcol = get(column_configuration, "rank", missing)
+        rank = rankcol === missing || !haskey(row, rankcol) ? missing : getproperty(row, rankcol)
+        return name, prog, offerdate, accept, choicedate, rank
     end
     return name, prog, getproperty(row, column_configuration["app season"])
 end
@@ -141,8 +143,8 @@ function extract_program_history(applicants::DataFrame, program_metadata=DummyMe
     firstoffer = Dict{ProgramKey,Date}()
     for row in eachrow(applicants)
         ret = parse_applicant_row(row, AdmitConfiguration.column_configuration)
-        if length(ret) == 5
-            name, prog, offerdate, accept, choicedate = ret
+        if length(ret) == 6
+            name, prog, offerdate, accept, choicedate, rank = ret
             pk = ProgramKey(prog, season(offerdate))
             firstoffer[pk] = min(get(firstoffer, pk, typemax(Date)), offerdate)
         elseif length(ret) == 3
@@ -180,9 +182,9 @@ function parse_applicants(applicants::DataFrame, program_history)
     napplicants = NormalizedApplicant[]
     for row in eachrow(applicants)
         ret = parse_applicant_row(row, AdmitConfiguration.column_configuration)
-        if length(ret) == 5
-            name, program, offerdate, accept, decidedate = ret
-            push!(napplicants, NormalizedApplicant(; name, program, offerdate, decidedate, accept, program_history))
+        if length(ret) == 6
+            name, program, offerdate, accept, decidedate, rank = ret
+            push!(napplicants, NormalizedApplicant(; name, program, offerdate, decidedate, accept, program_history, rank))
         elseif length(ret) == 3
             name, program, season = ret
             push!(napplicants, NormalizedApplicant(; name, program, season, program_history))

@@ -70,4 +70,5 @@ function todate_or_missing(d)
     dp = tryparse(Date, d, date_fmt[])
     return dp === nothing ? missing : dp
 end
+todate_or_missing(d::Real) = Date("1899-12-30") + Day(trunc(d))
 todate_or_missing(::Missing) = missing
