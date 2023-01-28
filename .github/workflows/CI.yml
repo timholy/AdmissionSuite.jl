@@ -35,6 +35,10 @@ jobs:
             ${{ runner.os }}-test-${{ env.cache-name }}-
             ${{ runner.os }}-test-
             ${{ runner.os }}-
+      - run: julia --project -e '
+          using Pkg;
+          Pkg.develop([PackageSpec(path="./AdmitConfiguration"), PackageSpec(path="./Admit"), PackageSpec(path="./AdmissionTargets")])
+          '
       - uses: julia-actions/julia-buildpkg@v1
       # Configure the suite (this omits SQL connection configuration since this isn't available on CI)
       - run: julia --project -e 'using AdmissionSuite; include(joinpath(pkgdir(AdmitConfiguration), "examples", "fake_configure_WashU.jl"));'
