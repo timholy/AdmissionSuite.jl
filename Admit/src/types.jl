@@ -65,7 +65,7 @@ struct ProgramData
     """
     lastdecisiondate::Date
 end
-ProgramData(; slots=0, nmatriculants=missing, napplicants=-1, firstofferdate=today(), lastdecisiondate=Date(0)) = ProgramData(slots, slots, nmatriculants, napplicants, todate_or_missing(firstofferdate), todate_or_missing(lastdecisiondate))
+ProgramData(; slots=0, nmatriculants=missing, napplicants=-1, firstofferdate=today(), lastdecisiondate=Date(0)) = ProgramData(slots, slots, nmatriculants, napplicants, date_or_missing(firstofferdate), date_or_missing(lastdecisiondate))
 function Base.:+(a::ProgramData, b::ProgramData)
     # if necessary, mark the dates as uninterpretable
     fod = a.firstofferdate == b.firstofferdate ? a.firstofferdate : Date(year(today())+10)
