@@ -165,10 +165,16 @@ where you might need to reference multiple columns in order to extract a particu
 
 Configure Admit for the specific way you represent dates with [`set_date_format`](@ref).
 
-### "Custom function" configuration
+### Applicant decision and "custom function" configuration
 
-These require that you write a few Julia functions and save them to a file. You then register these functions
-with [`set_local_functions`](@ref); see its documentation for details about which functions need to be implemented and examples of how to write them.
+If your database has simple columns like "Accept" (storing `true`/`false`/`missing` indicating whether the applicant
+accepted the offer of admission) and "Decision date" (storing the date of the applicant's decision),
+you can just select the appropriate column names with [`set_column_configuration`](@ref).
+
+However, if the applicant's decision is stored with more complicated logic (i.e., requires some calculation from
+multiple columns in the database), the best option is to write a few Julia functions and save them to a file.
+You then register these functions with [`set_local_functions`](@ref);
+see its documentation for details about which functions need to be implemented and examples of how to write them.
 
 If this step is daunting, seek help from a local Julia user or contact Tim Holy (WashU) for assistance.
 

@@ -34,4 +34,69 @@ include("io.jl")
 include("sql.jl")
 include("web.jl")
 
+using SnoopPrecompile
+
+@precompile_setup begin
+    struct FakeConn
+        applicants::DataFrame
+        programs::DataFrame
+    end
+    DBInterface.execute(conn::FakeConn, tablename::String) =
+        tablename == "applicants" ? conn.applicants :
+        tablename == "programs"   ? conn.programs   : error(tablename, " unrecognized")
+    function swapdata(container::Union{AbstractDict,AbstractSet}, newdata)
+        domerge!(c::AbstractDict, d) = merge!(c, d)
+        domerge!(c::AbstractSet, d) = !isempty(d) && push!(c, d...)
+
+        orig = copy(container)
+        empty!(container)
+        domerge!(container, newdata)
+        return orig
+    end
+
+    # Set up a fake configuration
+    sqldata = swapdata(AdmitConfiguration.sql_queries, Dict("applicants" => "applicants",
+                                                            "programs" => "programs"))
+    colconfig = swapdata(AdmitConfiguration.column_configuration,
+                         Dict(# Applicant parsing
+                              "name" => "applicant",
+                              "app program" => "program",
+                              "offer date" => "offer date",
+                              "rank" => "rank",
+                              "accept" => "accept",
+                              "decide date" => "decide date",
+                              # Program history parsing
+                              "prog program" => "program",
+                              "prog season" => "season",
+                              "slots" => "slots",
+                              "napplicants" => "napp",
+                              "nmatriculants" => "nmatric")
+    )
+    progdata = swapdata(AdmitConfiguration.program_abbreviations, Set(["A", "B"]))
+
+    # Fake data
+    programs = DataFrame("program" => ["A", "B", "A", "B"],
+                     "season" => [2022, 2022, 2023, 2023],
+                     "slots" => [2, 2, 2, 2],
+                     "nmatric" => [2, 3, 3, 2],
+                     "napp" => [20, 20, 20, 20])
+    applicants = DataFrame("applicant" => [randstring(8) for _ in 1:16],
+                           "season" => [fill(2022, 8); fill(2023, 8)],
+                           "program" => [fill("A", 4); fill("B", 4); fill("A", 4); fill("B", 4)],
+                           "offer date" => [fill("02/08/2022", 8); fill("02/08/2023", 8)],
+                           "decide date" => [fill("04/15/2022", 8); fill(missing, 8)],
+                           "rank" => [1, 2, 3, 4, 1, 2, 3, 4, 1, 2, 3, 4, 1, 2, 3, 4],
+                           "accept" => [[true, false, true, false, true, false, true, false]; fill(missing, 8)])
+    conn = FakeConn(applicants, programs)
+
+    @precompile_all_calls begin
+        parse_database(conn)
+        # runweb(conn; tnow=Date(2023, 3, 1))  # this would be nice, but clean shutdown is difficult
+    end
+    precompile(runweb, (typeof(conn),))
+    swapdata(AdmitConfiguration.sql_queries, sqldata)
+    swapdata(AdmitConfiguration.column_configuration, colconfig)
+    swapdata(AdmitConfiguration.program_abbreviations, progdata)
+end
+
 end

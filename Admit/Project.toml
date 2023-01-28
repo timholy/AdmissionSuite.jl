@@ -17,6 +17,7 @@ NLsolve = "2774e3e8-f4cf-5e23-947b-6d7e65073b56"
 ODBC = "be6f12e9-ca4f-5eb2-a339-a4f995cc0291"
 ProgressMeter = "92933f4c-e287-5a05-a399-4b506db050ca"
 Random = "9a3f8284-a2c9-5f02-9a11-845980a1fd5c"
+SnoopPrecompile = "66db9d55-30c0-4569-8b51-7e840670fc0c"
 Statistics = "10745b16-79ce-11e8-11f9-7d13ad32a3b2"
 
 [compat]
@@ -30,6 +31,7 @@ Measurements = "2"
 NLsolve = "4"
 ODBC = "1"
 ProgressMeter = "1"
+SnoopPrecompile = "1"
 julia = "1.6"
 
 [extras]
