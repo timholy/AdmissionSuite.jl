@@ -1,9 +1,5 @@
 ## Lower-level utilities
 
-date_or_missing(::Missing) = missing
-date_or_missing(date::Date) = date
-date_or_missing(date::AbstractString) = Date(date)
-
 null(::Type{NTuple{N,T}}) where {N,T} = ntuple(_ -> zero(T), N)
 
 """

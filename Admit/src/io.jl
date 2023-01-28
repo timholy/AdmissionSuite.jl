@@ -16,7 +16,7 @@ function read_program_history(filename::AbstractString)
             ProgramKey(season=row.year, program=row.program) => ProgramData(slots=row.slots,
                                                                             nmatriculants=get(row, :nmatriculants, missing),
                                                                             napplicants=row.napplicants,
-                                                                            firstofferdate=date_or_missing(row.firstofferdate),
+                                                                            firstofferdate=todate_or_missing(row.firstofferdate),
                                                                             lastdecisiondate=row.lastdecisiondate)
         end)
     catch
