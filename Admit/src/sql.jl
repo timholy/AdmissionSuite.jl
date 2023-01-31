@@ -76,8 +76,8 @@ function parse_applicant_row(row, column_configuration)
     end
     offerdate = todate_or_missing(getproperty(row, column_configuration["offer date"]))
     if !ismissing(offerdate)
-        accept = getaccept(row)
-        choicedate = getdecidedate(row)
+        accept = try getaccept(row) catch _ getproperty(row, column_configuration["accept"]) end
+        choicedate = try getdecidedate(row) catch _ todate_or_missing(getproperty(row, column_configuration["decide date"])) end
         rankcol = get(column_configuration, "rank", missing)
         rank = rankcol === missing || !haskey(row, rankcol) ? missing : getproperty(row, rankcol)
         return name, prog, offerdate, accept, choicedate, rank

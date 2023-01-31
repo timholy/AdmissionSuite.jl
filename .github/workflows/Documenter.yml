@@ -15,6 +15,10 @@ jobs:
         with:
           version: '1.6'
           show-versioninfo: true         # this causes versioninfo to be printed to the action log
+      - run: julia --project -e '
+          using Pkg;
+          Pkg.develop([PackageSpec(path="./AdmitConfiguration"), PackageSpec(path="./Admit"), PackageSpec(path="./AdmissionTargets")])
+          '
       - uses: julia-actions/julia-buildpkg@latest
       - run:  julia --project -e 'using AdmitConfiguration, CSV; set_programs(joinpath(pkgdir(AdmitConfiguration), "examples", "WashU.csv"))'
       - uses: julia-actions/julia-docdeploy@latest

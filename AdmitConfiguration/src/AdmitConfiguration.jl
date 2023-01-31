@@ -138,6 +138,10 @@ Applicant table columns:
   if an offer date is not available for a candidate
 - "rank" (optional): the applicant rank assigned by the admissions committee/interviewers. From highest (top-rated) to lowest,
   they should be numbered 1, 2, 3, ... Each program should have separate ranking.
+- "accept" (optional): `true`/`false`/`missing` indicating whether the applicant accepted the offer of admission.
+  The alternative to setting this column is [`set_local_functions`](@ref).
+- "decide date" (optional): the date of the applicant's decision.
+  The alternative to setting this column is [`set_local_functions`](@ref).
 
 Program table columns:
 
@@ -159,7 +163,9 @@ See also: [`set_local_functions`](@ref).
 function set_column_configuration(pairs...)
     function rekey((key, val))
         if key ∈ ("name", "app program", "offer date", "app season", "rank",
-                  "prog program", "prog season", "slots", "napplicants", "nmatriculants")
+                  "prog program", "prog season", "slots", "napplicants", "nmatriculants",
+                  "accept", "decide date",        # alternatives to `set_local_functions`
+                  )
             isa(val, AbstractString) || error(key, " must be a string")
         else
             error("unrecognized key ", key)
