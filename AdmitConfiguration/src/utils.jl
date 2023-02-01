@@ -70,5 +70,6 @@ function todate_or_missing(d)
     dp = tryparse(Date, d, date_fmt[])
     return dp === nothing ? missing : dp
 end
+# SQL can encode dates as integers: https://stackoverflow.com/questions/5505935/convert-from-datetime-to-int
 todate_or_missing(d::Real) = Date("1899-12-30") + Day(trunc(d))
 todate_or_missing(::Missing) = missing
