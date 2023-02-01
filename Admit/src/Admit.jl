@@ -61,6 +61,7 @@ using SnoopPrecompile
                          Dict(# Applicant parsing
                               "name" => "applicant",
                               "app program" => "program",
+                              "app season" => "season",
                               "offer date" => "offer date",
                               "rank" => "rank",
                               "accept" => "accept",
