@@ -141,9 +141,11 @@ combination. The remaining data come from `program_metadata`, which can be obtai
 """
 function extract_program_history(applicants::DataFrame, program_metadata=DummyMetadata())
     firstoffer = Dict{ProgramKey,Date}()
+    havefull = false
     for row in eachrow(applicants)
         ret = parse_applicant_row(row, AdmitConfiguration.column_configuration)
         if length(ret) == 6
+            havefull = true
             name, prog, offerdate, accept, choicedate, rank = ret
             pk = ProgramKey(prog, season(offerdate))
             firstoffer[pk] = min(get(firstoffer, pk, typemax(Date)), offerdate)
@@ -153,6 +155,7 @@ function extract_program_history(applicants::DataFrame, program_metadata=DummyMe
             get!(firstoffer, pk, typemax(Date))
         end
     end
+    havefull || error("did not extract any full rows; check whether dates are in the format `$(AdmitConfiguration.date_fmt[])` expected by `AdmitConfiguration.date_fmt`")
     keys_with_sentinel = ProgramKey[]
     for (pk, d) in firstoffer
         if d == typemax(Date)
