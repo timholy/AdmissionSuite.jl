@@ -72,7 +72,7 @@ Admit.run_server(app, "0.0.0.0", debug=true)
 ```
 """
 function manage_offers(fetch_past_applicants::Function, fetch_applicants::Function, fetch_program_data::Function, tnow::Union{Date,Function}=today();
-                       σthresh=2, σsel=0.2f0, σyield=1.0f0, σr=0.5f0, σt=Inf32, refresh=Ref(false))
+                       σthresh=2, σsel=Inf32, σyield=0.5f0, σr=0.2f0, σt=0.5f0, refresh=Ref(false))
     past_applicants = fetch_past_applicants()
     program_history = fetch_program_data()
     offerdat = offerdata(past_applicants, program_history)
