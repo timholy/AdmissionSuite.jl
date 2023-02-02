@@ -74,6 +74,8 @@ using SnoopPrecompile
                               "nmatriculants" => "nmatric")
     )
     progdata = swapdata(AdmitConfiguration.program_abbreviations, Set(["A", "B"]))
+    dfmt = AdmitConfiguration.date_fmt[]
+    AdmitConfiguration.date_fmt[] = dateformat"mm/dd/yyyy"
 
     # Fake data
     programs = DataFrame("program" => ["A", "B", "A", "B"],
@@ -98,6 +100,7 @@ using SnoopPrecompile
     swapdata(AdmitConfiguration.sql_queries, sqldata)
     swapdata(AdmitConfiguration.column_configuration, colconfig)
     swapdata(AdmitConfiguration.program_abbreviations, progdata)
+    AdmitConfiguration.date_fmt[] = dfmt
 end
 
 end
