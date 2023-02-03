@@ -75,12 +75,17 @@ function parse_applicant_row(row, column_configuration)
         return name
     end
     offerdate = todate_or_missing(getproperty(row, column_configuration["offer date"]))
+    rejectdate = todate_or_missing(getproperty(row, "Interviewed, Reject Date"))           # TODO: add to config
+    withdrewdate1 = todate_or_missing(getproperty(row, "Withdrew Before Interview Date"))
+    if !ismissing(rejectdate) || !ismissing(withdrewdate1)
+        return name, prog, missing, missing, true, rejectdate, missing
+    end
     if !ismissing(offerdate)
         accept = try getaccept(row) catch _ getproperty(row, column_configuration["accept"]) end
         choicedate = try getdecidedate(row) catch _ todate_or_missing(getproperty(row, column_configuration["decide date"])) end
         rankcol = get(column_configuration, "rank", missing)
         rank = rankcol === missing || !haskey(row, rankcol) ? missing : getproperty(row, rankcol)
-        return name, prog, offerdate, accept, choicedate, rank
+        return name, prog, offerdate, accept, false, choicedate, rank
     end
     return name, prog, getproperty(row, column_configuration["app season"])
 end
@@ -146,7 +151,8 @@ function extract_program_history(applicants::DataFrame, program_metadata=DummyMe
         ret = parse_applicant_row(row, AdmitConfiguration.column_configuration)
         if length(ret) == 6
             havefull = true
-            name, prog, offerdate, accept, choicedate, rank = ret
+            name, prog, offerdate, accept, rejected, choicedate, rank = ret
+            rejected && continue
             pk = ProgramKey(prog, season(offerdate))
             firstoffer[pk] = min(get(firstoffer, pk, typemax(Date)), offerdate)
         elseif length(ret) == 3
@@ -186,7 +192,8 @@ function parse_applicants(applicants::DataFrame, program_history)
     for row in eachrow(applicants)
         ret = parse_applicant_row(row, AdmitConfiguration.column_configuration)
         if length(ret) == 6
-            name, program, offerdate, accept, decidedate, rank = ret
+            name, program, offerdate, accept, rejected, decidedate, rank = ret
+            rejected && continue
             push!(napplicants, NormalizedApplicant(; name, program, offerdate, decidedate, accept, program_history, rank))
         elseif length(ret) == 3
             name, program, season = ret
