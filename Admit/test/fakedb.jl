@@ -21,6 +21,8 @@ DBInterface.execute(conn::FakeConn, tablename::String) =
 
     # Save column_configuration and sql_queries before we modify them
     cc = copy(Admit.AdmitConfiguration.column_configuration)
+    dfmt = AdmitConfiguration.date_fmt[]
+    AdmitConfiguration.date_fmt[] = DateFormat("mm/dd/yyyy")
     Admit.AdmitConfiguration.column_configuration["napplicants"] = "napp"
     Admit.AdmitConfiguration.column_configuration["nmatriculants"] = "nmatric"
     sqlq = copy(Admit.AdmitConfiguration.sql_queries)
@@ -40,12 +42,12 @@ DBInterface.execute(conn::FakeConn, tablename::String) =
         end
 
         getapplicant(apps, name) = apps[findfirst(app->app.name==name, apps)]
-        @test length(applicants) == 8
-        for (name, prog, nod, accept, dd) in zip(("Last1, First1", "Last2, First2", "Last3, First3", "Last4, First4"),
-                                                ("MGG", "MMMP", "NS", "PMB"),
-                                                (missing, 0.0f0, 0.0f0, missing),
-                                                (missing, false, true, missing),
-                                                (missing, Date(2021, 3, 3), Date(2021, 4, 1), missing))
+        @test length(applicants) == 4
+        for (name, prog, nod, accept, dd) in zip(("Last2, First2", "Last3, First3"),
+                                                ("MMMP", "NS"),
+                                                (0.0f0, 0.0f0),
+                                                (false, true),
+                                                (Date(2021, 3, 3), Date(2021, 4, 1)))
             app = applicants[findfirst(app->app.applicantdata.name==name, applicants)]
             @test app.program == prog
             @test app.season == 2021
@@ -70,5 +72,6 @@ DBInterface.execute(conn::FakeConn, tablename::String) =
         merge!(Admit.AdmitConfiguration.column_configuration, cc)
         empty!(Admit.AdmitConfiguration.sql_queries)
         merge!(Admit.AdmitConfiguration.sql_queries, sqlq)
+        AdmitConfiguration.date_fmt[] = dfmt
     end
 end

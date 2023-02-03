@@ -165,6 +165,8 @@ end
     end
 
     @testset "SQL table parsing" begin
+        dfmt = AdmitConfiguration.date_fmt[]
+        AdmitConfiguration.date_fmt[] = DateFormat("mm/dd/yyyy")
         df = CSV.File(joinpath(@__DIR__, "data", "sql_applicant_table.csv")) |> DataFrame
         program_history = @test_logs (:warn, r"No first offer date identified for.*MGG.*PMB") Admit.extract_program_history(df)
         @test program_history[ProgramKey("MGG", 2021)].firstofferdate == typemax(Date)
@@ -178,11 +180,11 @@ end
         program_history = @test_logs (:warn, r"No first offer date identified for.*MGG.*PMB") Admit.extract_program_history(df, metadata)
         @test program_history[ProgramKey("MGG", 2021)].nmatriculants == 10
         applicants = Admit.parse_applicants(df, program_history)
-        @test length(applicants) == 4
-        @test applicants[1].program == "MGG"  && ismissing(applicants[1].normofferdate) && ismissing(applicants[1].accept)
-        @test applicants[2].program == "MMMP" && applicants[2].normofferdate == 0 && !applicants[2].accept
-        @test applicants[3].program == "NS"   && applicants[3].normofferdate == 0 &&  applicants[3].accept
-        @test applicants[4].program == "PMB"  && ismissing(applicants[4].normofferdate) && ismissing(applicants[4].accept)
+        # Applicants who don't get an offer (either due to rejection or withdrawal before receiving an offer) should be culled from the list
+        @test length(applicants) == 2
+        @test applicants[1].program == "MMMP" && applicants[1].normofferdate == 0 && !applicants[1].accept
+        @test applicants[2].program == "NS"   && applicants[2].normofferdate == 0 &&  applicants[2].accept
+        AdmitConfiguration.date_fmt[] = dfmt
     end
 
     @testset "Model training" begin

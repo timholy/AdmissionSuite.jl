@@ -72,17 +72,23 @@ function parse_applicant_row(row, column_configuration)
     prog = try
         validateprogram(getproperty(row, column_configuration["app program"]))
     catch
-        return name
+        return name  # applicant will be dropped, presumably an old program not relevant for tracking anymore
     end
+    # Record `accept` for all applicants, even if they haven't gotten an offer yet:
+    # - accept=false: rejected, declined, or withdrew prior to receiving an offer (those who declined have an `offerdate`, the others do not)
+    # - accept=missing: received an offer or on the waitlist (disambiguate using `offerdate`)
+    # - accept=true: accepted the offer
+    ccaccept = get(column_configuration, "accept", missing)
+    accept = ismissing(ccaccept) ? getaccept(row) : getproperty(row, ccaccept)
     offerdate = todate_or_missing(getproperty(row, column_configuration["offer date"]))
     if !ismissing(offerdate)
-        accept = try getaccept(row) catch _ getproperty(row, column_configuration["accept"]) end
-        choicedate = try getdecidedate(row) catch _ todate_or_missing(getproperty(row, column_configuration["decide date"])) end
+        ccdd = get(column_configuration, "decide date", missing)
+        choicedate = ismissing(ccdd) ? getdecidedate(row) : todate_or_missing(getproperty(row, ccdd))
         rankcol = get(column_configuration, "rank", missing)
         rank = rankcol === missing || !haskey(row, rankcol) ? missing : getproperty(row, rankcol)
         return name, prog, offerdate, accept, choicedate, rank
     end
-    return name, prog, getproperty(row, column_configuration["app season"])
+    return name, prog, getproperty(row, column_configuration["app season"]), accept
 end
 
 function parse_program_row(row, column_configuration)
@@ -149,8 +155,8 @@ function extract_program_history(applicants::DataFrame, program_metadata=DummyMe
             name, prog, offerdate, accept, choicedate, rank = ret
             pk = ProgramKey(prog, season(offerdate))
             firstoffer[pk] = min(get(firstoffer, pk, typemax(Date)), offerdate)
-        elseif length(ret) == 3
-            name, prog, _season = ret
+        elseif length(ret) == 4
+            name, prog, _season, accept = ret
             pk = ProgramKey(prog, _season)
             get!(firstoffer, pk, typemax(Date))
         end
@@ -181,6 +187,13 @@ programdata(firstofferdate::Date; lastdecisiondate=decisiondeadline(season(first
 programdata(season::Integer; lastdecisiondate=decisiondeadline(season), kwargs...) =
     ProgramData(; lastdecisiondate, kwargs...)
 
+"""
+    napplicants = parse_applicants(applicants::DataFrame, program_history)
+
+Parse the `applicants` DataFrame into a vector of `NormalizedApplicant`s. Only applicants who received an offer of admission
+are included. The `program_history` is used to determine the date of the first offer for the program during that season, and thus
+the "normalized date" on which the offer was extended.
+"""
 function parse_applicants(applicants::DataFrame, program_history)
     napplicants = NormalizedApplicant[]
     for row in eachrow(applicants)
@@ -188,8 +201,9 @@ function parse_applicants(applicants::DataFrame, program_history)
         if length(ret) == 6
             name, program, offerdate, accept, decidedate, rank = ret
             push!(napplicants, NormalizedApplicant(; name, program, offerdate, decidedate, accept, program_history, rank))
-        elseif length(ret) == 3
-            name, program, season = ret
+        elseif length(ret) == 4
+            name, program, season, accept = ret
+            accept === false && continue    # skip applicants who will never receive an offer
             push!(napplicants, NormalizedApplicant(; name, program, season, program_history))
         end
     end

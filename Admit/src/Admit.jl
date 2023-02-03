@@ -34,9 +34,9 @@ include("io.jl")
 include("sql.jl")
 include("web.jl")
 
-using SnoopPrecompile
+using PrecompileTools
 
-@precompile_setup begin
+@setup_workload begin
     struct FakeConn
         applicants::DataFrame
         programs::DataFrame
@@ -92,7 +92,7 @@ using SnoopPrecompile
                            "accept" => [[true, false, true, false, true, false, true, false]; fill(missing, 8)])
     conn = FakeConn(applicants, programs)
 
-    @precompile_all_calls begin
+    @compile_workload begin
         parse_database(conn)
         # runweb(conn; tnow=Date(2023, 3, 1))  # this would be nice, but clean shutdown is difficult
     end

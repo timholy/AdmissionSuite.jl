@@ -3,11 +3,14 @@
 # See the AdmissionSuite/.github/workflows/CI.yml file for the needed configuration steps
 
 using AdmissionTargets
+using AdmitConfiguration
 using Dates
 using Test
 
 @testset "AdmissionTargets.jl" begin
     @testset "Targets" begin
+        dfmt = AdmitConfiguration.date_fmt[]
+        AdmitConfiguration.date_fmt[] = DateFormat("mm/dd/yyyy")
         # Test the "don't game the system" ethic
         program_applicants = Dict("ATMP" => 10, "BTMP" => 10, "CTMP" => 10)
         fiis = Dict("ATMP" => 2, "BTMP" => 2, "CTMP" => 2)
@@ -163,5 +166,6 @@ using Test
         @test tgts["ProgA"] ≈ 4
         @test tgts["ProgB"] ≈ 6
         @test_logs (:warn, "The following programs 'earned' less than one slot (give them notice): [\"ProgA\"]") targets(Dict("ProgA"=>1, "ProgB"=>11), nothing, 11, 2)
+        AdmitConfiguration.date_fmt[] = dfmt
     end
 end
