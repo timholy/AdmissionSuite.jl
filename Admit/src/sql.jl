@@ -75,10 +75,16 @@ function parse_applicant_row(row, column_configuration)
         return name
     end
     offerdate = todate_or_missing(getproperty(row, column_configuration["offer date"]))
-    rejectdate = todate_or_missing(getproperty(row, "Interviewed, Reject Date"))           # TODO: add to config
-    withdrewdate1 = todate_or_missing(getproperty(row, "Withdrew Before Interview Date"))
+    rejectdate = haskey(row, "Interviewed, Reject Date") ? todate_or_missing(getproperty(row, "Interviewed, Reject Date")) : missing           # TODO: add to config
+    withdrewdate1 = missing
+    if haskey(row, "Withdrew Before Interview Date")
+        withdrewdate1 = todate_or_missing(getproperty(row, "Withdrew Before Interview Date"))
+    end
+    if ismissing(withdrewdate1) && haskey(row, "Withdrew Following Interview Date")
+        withdrewdate1 = todate_or_missing(getproperty(row, "Withdrew Following Interview Date"))
+    end
     if !ismissing(rejectdate) || !ismissing(withdrewdate1)
-        return name, prog, missing, missing, true, rejectdate, missing
+        return name, prog, missing, missing, true, coalesce(rejectdate, withdrewdate1), missing
     end
     if !ismissing(offerdate)
         accept = try getaccept(row) catch _ getproperty(row, column_configuration["accept"]) end
@@ -149,7 +155,7 @@ function extract_program_history(applicants::DataFrame, program_metadata=DummyMe
     havefull = false
     for row in eachrow(applicants)
         ret = parse_applicant_row(row, AdmitConfiguration.column_configuration)
-        if length(ret) == 6
+        if length(ret) == 7
             havefull = true
             name, prog, offerdate, accept, rejected, choicedate, rank = ret
             rejected && continue
@@ -191,7 +197,7 @@ function parse_applicants(applicants::DataFrame, program_history)
     napplicants = NormalizedApplicant[]
     for row in eachrow(applicants)
         ret = parse_applicant_row(row, AdmitConfiguration.column_configuration)
-        if length(ret) == 6
+        if length(ret) == 7
             name, program, offerdate, accept, rejected, decidedate, rank = ret
             rejected && continue
             push!(napplicants, NormalizedApplicant(; name, program, offerdate, decidedate, accept, program_history, rank))
