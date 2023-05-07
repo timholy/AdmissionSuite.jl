@@ -5,8 +5,13 @@
 """
     getaccept(row)
 
-Return `true` or `false` depending on whether the applicant in `row` (a row of the applicant table)
-accepted the offer of admission.
+Return
+    - `true` if the applicant has accepted an offer of admission
+    - `false` if the applicant is no longer a candidate for admission
+    - `missing` if the applicant is a candidate but the decision is unknown
+
+A `getaccept` function can be omitted if your database has a column containing this information
+(see [`set_column_configuration`](@ref) for `"accept"`).
 
 # Example
 
@@ -17,15 +22,28 @@ or "Withdrew". Then in simplest form you could implement this function as:
 getaccept(row) = row."Outcome" == "Accept"
 ```
 
-More sophisticated implementations might check for unexpected values and throw an error if they are encountered.
+A better implementation might allow the "Outcome" field to be blank, returning `missing` in that case:
+
+```julia
+function getaccept(row)
+    outcome = row."Outcome"
+    (ismissing(outcome) || isempty(outcome)) && return missing
+    return outcome == "Accept"
+end
+```
+
+Even more sophisticated implementations might check for unexpected values and throw an error if they are encountered.
 """
 function getaccept end
 
 """
     getdecidedate(row)
 
-Return the date on which the applicant in `row`  (a row of the applicant table) informed admissions
-about their decision about whether to accept the offer of admission.
+Return the date on which the verdict for the applicant in `row` (a row of the applicant table) was determined.
+This might be the date where they either accepted an offer, were rejected, or withdrew their application.
+
+A `getdecidedate` function can be omitted if your database has a column containing this information
+(see [`set_column_configuration`](@ref) for `"decide date"`).
 
 # Example
 

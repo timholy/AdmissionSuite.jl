@@ -28,7 +28,7 @@ const program_range = Dict{String,UnitRange{Int}}()
 const program_substitutions = Dict{String,Vector{String}}()
 const sql_dsn = Ref{String}()
 const sql_queries = Dict{String,String}()
-const date_fmt = Ref{DateFormat}(DateFormat(@load_preference("date_format", "mm/dd/yyyy")))
+const date_fmt = Ref{DateFormat}(DateFormat("mm/dd/yyyy"))
 const local_functions = Ref{Union{String,Nothing}}()
 const column_configuration = Dict{String,String}()
 
@@ -139,9 +139,9 @@ Applicant table columns:
 - "rank" (optional): the applicant rank assigned by the admissions committee/interviewers. From highest (top-rated) to lowest,
   they should be numbered 1, 2, 3, ... Each program should have separate ranking.
 - "accept" (optional): `true`/`false`/`missing` indicating whether the applicant accepted the offer of admission.
-  The alternative to setting this column is [`set_local_functions`](@ref).
+  The alternative to setting this column is [`set_local_functions`](@ref), but "accept" takes precedence.
 - "decide date" (optional): the date of the applicant's decision.
-  The alternative to setting this column is [`set_local_functions`](@ref).
+  The alternative to setting this column is [`set_local_functions`](@ref), but "decide date" takes precedence.
 
 Program table columns:
 
@@ -208,6 +208,10 @@ function loadprefs()
         end
     end
 
+    dfmt = @load_preference("date_format")
+    if dfmt !== nothing
+        date_fmt[] = DateFormat(dfmt)
+    end
     plook = @load_preference("program_lookups")
     plook !== nothing && merge!(program_lookups, plook)
     pabv = @load_preference("program_abbreviations")

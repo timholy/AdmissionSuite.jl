@@ -14,7 +14,17 @@ function getdecidedate(row)
     if acc === true
         return todate_or_missing(row."Class Member Date")
     elseif acc === false
-        return todate_or_missing(row."Declined Date")
+        rawdate = row."Declined Date"
+        # In real applications we know these columns exist (the `hasproperty` checks always return `true`),
+        # but the WashU config is also used for testing and some of the fake data sets don't set these columns.
+        # For your own institution, you probably don't need the `hasproperty` checks.
+        if (ismissing(rawdate) || isempty(rawdate)) && hasproperty(row, "Interviewed, Reject Date")
+            rawdate = row."Interviewed, Reject Date"
+        end
+        if (ismissing(rawdate) || isempty(rawdate)) && hasproperty(row, "Withdrew Following Interview Date")
+            rawdate = row."Withdrew Following Interview Date"
+        end
+        return todate_or_missing(rawdate)
     end
     return missing
 end

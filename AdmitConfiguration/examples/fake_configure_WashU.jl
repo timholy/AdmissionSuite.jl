@@ -20,3 +20,4 @@ set_column_configuration(# Applicant table
                          "napplicants" => "Total Applicants",
                          # nmatriculants not present
 )
+set_date_format("y-m-d H:M:S.s")
