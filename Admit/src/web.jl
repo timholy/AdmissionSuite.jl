@@ -83,6 +83,7 @@ function manage_offers(fetch_past_applicants::Function, fetch_applicants::Functi
 
     applicants = Ref(fetch_applicants())
     progs = sort(unique(pk.program for (pk, _) in program_history if pk.season == season(get_tnow(tnow))))
+    probsubst = build_program_synonyms(progs)
     target = compute_target(program_history, _season)
 
     target_input = dcc_input(id="total-target", value=compute_target(program_history, season(get_tnow(tnow))), type="number")
@@ -128,11 +129,11 @@ function manage_offers(fetch_past_applicants::Function, fetch_applicants::Functi
             target = tgt
             return render_tab_summary(fmatch, past_applicants, applicants[], get_tnow(tnow), program_history, target, σthresh)
         elseif active_tab == "tab-program"
-            return render_program_zoom(fmatch, past_applicants, filter(app->app.program==prog, applicants[]), get_tnow(tnow), program_history[ProgramKey(prog, _season)], prog)
+            return render_program_zoom(fmatch, past_applicants, filter(app->app.program∈progsubst[prog], applicants[]), get_tnow(tnow), program_history[ProgramKey(prog, _season)], progsubst[prog])
         elseif active_tab == "tab-initial"
             return render_tab_initial(fmatch, past_applicants, applicants[], Date(_season), program_history, target, σthresh)
         elseif active_tab == "tab-internals"
-            return render_internals(fmatch, past_applicants, applicants[], get_tnow(tnow), program_history, progsim, progs)
+            return render_internals(fmatch, past_applicants, applicants[], get_tnow(tnow), program_history, progsim, progs, progsubst)
         else
             return html_p("An unexpected tab error occurred, please report how to trigger this error")
         end
@@ -213,7 +214,7 @@ function render_program_zoom(fmatch::Function,
                              applicants::AbstractVector{NormalizedApplicant},
                              tnow::Date,
                              pd::ProgramData,
-                             prog::AbstractString)
+                             prog::AbstractVector{<:AbstractString})
     function calc_pmatric(applicant)  # TODO? copied from add_offers!, would be better not to copy but it's a closure...
         ndd = applicant.normdecidedate
         ndd !== missing && ndd <= ntnow && return Float32(applicant.accept::Bool)
@@ -248,7 +249,7 @@ function render_program_zoom(fmatch::Function,
     seasonrange = (typemax(Int), typemin(Int))
     update_range((_min, _max), x) = (min(_min, x), max(_max, x))
     for app in past_applicants
-        app.program == prog || continue
+        app.program ∈ prog || continue
         ndd = app.normdecidedate
         isa(ndd, Real) || continue
         if app.accept === true
@@ -351,7 +352,8 @@ function render_internals(fmatch::Function,
                           tnow::Date,
                           program_history,
                           progsim::Function,
-                          progs::AbstractVector{<:AbstractString})
+                          progs::AbstractVector{<:AbstractString},
+                          progsubst::AbstractDict{String})
     _season = season(tnow)
     psim = [[progsim(px, py) for px in progs] for py in progs]
     nmatches = Dict{String,Measurement{Float64}}()
@@ -360,7 +362,7 @@ function render_internals(fmatch::Function,
         ntnow = normdate(tnow, program_history[ProgramKey(program=prog, season=_season)])
         for app in applicants
             ndd = app.normdecidedate
-            app.program == prog && (ismissing(ndd) || ndd > ntnow) || continue
+            app.program ∈ progsubst[prog] && (ismissing(ndd) || ndd > ntnow) || continue
             push!(nsim, sum(pastapp->fmatch(app, pastapp, ntnow), past_applicants))
         end
         nmatches[prog] = round(mean(nsim); digits=1) ± round(std(nsim); digits=1)

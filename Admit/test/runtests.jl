@@ -3,6 +3,7 @@
 # See the AdmissionSuite/.github/workflows/CI.yml file for the needed configuration steps
 
 using Admit
+using AdmitConfiguration
 using Dates
 using CSV
 using DataFrames
@@ -390,7 +391,7 @@ end
 
     @testset "Web" begin
         # We don't test that it renders, but we do check all the callbacks
-        progs = ["BBSB","BIDS","CB","CSB","DRSCB","EEPB","HSG","IMM","MCB","MGG","MMMP","NS","PMB"]
+        progs = ["BBSB","BIDS","CB","CSB","DRSCB","EEB","IMM","MCB","MGG","MMMP","NS","PMB"]
         yrs = 2017:2022
         program_history = Dict{ProgramKey,ProgramData}()
         for yr in yrs, prog in progs
@@ -425,13 +426,14 @@ end
             past_applicants, applicants, fixeddate, program_history, target, 2)
         @test isa(tab, Admit.DashBase.Component)
         prog = "MMMP"
+        progsubst = Admit.build_program_synonyms(progs)
         tab = Admit.render_program_zoom(fmatch, past_applicants,
-            filter(app->app.program==prog, applicants), fixeddate, program_history[ProgramKey(prog,last(yrs))], prog)
+            filter(app->app.program==prog, applicants), fixeddate, program_history[ProgramKey(prog,last(yrs))], progsubst[prog])
         @test isa(tab, Admit.DashBase.Component)
         tab = Admit.render_tab_initial(fmatch,
             past_applicants, applicants, fixeddate, program_history, target, 2)
         @test isa(tab, Admit.DashBase.Component)
-        tab = Admit.render_internals(fmatch, past_applicants, applicants, fixeddate, program_history, Admit.default_similarity, progs)
+        tab = Admit.render_internals(fmatch, past_applicants, applicants, fixeddate, program_history, Admit.default_similarity, progs, progsubst)
         @test isa(tab, Admit.DashBase.Component)
     end
 end

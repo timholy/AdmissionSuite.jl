@@ -1,4 +1,5 @@
 using Admit
+using AdmitConfiguration
 using Admit.CSV
 using DataFrames
 using DBInterface
