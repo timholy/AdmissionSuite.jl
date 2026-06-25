@@ -11,7 +11,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2
-      - uses: julia-actions/setup-julia@v1
+      - uses: julia-actions/setup-julia@v3
         with:
           version: '1.6'
           show-versioninfo: true         # this causes versioninfo to be printed to the action log
