@@ -12,6 +12,11 @@ MariaDB_Connector_C_jll = "aabc7e14-95f1-5e66-9f32-aea603782360"
 MariaDB_Connector_ODBC_jll = "1124d457-72a3-5205-9757-36a127c7d0f8"
 ODBC = "be6f12e9-ca4f-5eb2-a339-a4f995cc0291"
 
+[sources]
+AdmitConfiguration = {path = "AdmitConfiguration"}
+Admit = {path = "Admit"}
+AdmissionTargets = {path = "AdmissionTargets"}
+
 [compat]
 CSV = "0.9, 0.10"
 MariaDB_Connector_C_jll = "3"
