@@ -9,19 +9,25 @@ jobs:
   Documenter:
     name: Documentation
     runs-on: ubuntu-latest
+    timeout-minutes: 60
+    permissions:
+      actions: write    # needed by julia-actions/cache to delete old caches
+      contents: write   # needed to push to gh-pages
+      statuses: write   # needed for the documentation preview status
     steps:
-      - uses: actions/checkout@v2
-      - uses: julia-actions/setup-julia@v1
+      - uses: actions/checkout@v4
+      - uses: julia-actions/setup-julia@v3
         with:
-          version: '1.6'
+          version: '1.10'
           show-versioninfo: true         # this causes versioninfo to be printed to the action log
-      - run: julia --project -e '
+      - uses: julia-actions/cache@v2
+      # Develop the suite's packages into the docs environment so the docs build against the checkout.
+      - run: julia --project=docs -e '
           using Pkg;
-          Pkg.develop([PackageSpec(path="./AdmitConfiguration"), PackageSpec(path="./Admit"), PackageSpec(path="./AdmissionTargets")])
+          Pkg.develop([PackageSpec(path="AdmitConfiguration"), PackageSpec(path="Admit"), PackageSpec(path="AdmissionTargets")]);
+          Pkg.instantiate()
           '
-      - uses: julia-actions/julia-buildpkg@latest
-      - run:  julia --project -e 'using AdmitConfiguration, CSV; set_programs(joinpath(pkgdir(AdmitConfiguration), "examples", "WashU.csv"))'
-      - uses: julia-actions/julia-docdeploy@latest
+      - uses: julia-actions/julia-docdeploy@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           DOCUMENTER_KEY: ${{ secrets.DOCUMENTER_KEY }}

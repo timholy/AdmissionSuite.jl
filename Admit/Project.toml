@@ -20,6 +20,9 @@ ProgressMeter = "92933f4c-e287-5a05-a399-4b506db050ca"
 Random = "9a3f8284-a2c9-5f02-9a11-845980a1fd5c"
 Statistics = "10745b16-79ce-11e8-11f9-7d13ad32a3b2"
 
+[sources]
+AdmitConfiguration = {path = "../AdmitConfiguration"}
+
 [compat]
 CSV = "0.8, 0.9.3, 0.10"
 Dash = "1.1"
@@ -32,7 +35,7 @@ NLsolve = "4"
 ODBC = "1"
 PrecompileTools = "1"
 ProgressMeter = "1"
-julia = "1.6"
+julia = "1.10"
 
 [extras]
 DBInterface = "a10d1c49-ce27-4219-8d33-6db1a4562965"

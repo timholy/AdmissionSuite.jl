@@ -6,9 +6,9 @@ using Documenter
 DocMeta.setdocmeta!(Admit, :DocTestSetup, :(using Admit); recursive=true)
 
 makedocs(;
-    modules=[Admit],
+    modules=[Admit, AdmitConfiguration, AdmissionTargets],
     authors="Tim Holy <tim.holy@gmail.com> and contributors",
-    repo="https://github.com/timholy/AdmissionSuite.jl/blob/{commit}{path}#{line}",
+    repo=Documenter.Remotes.GitHub("timholy", "AdmissionSuite.jl"),
     sitename="AdmissionSuite.jl",
     format=Documenter.HTML(;
         prettyurls=get(ENV, "CI", "false") == "true",

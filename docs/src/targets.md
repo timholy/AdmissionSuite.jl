@@ -56,10 +56,15 @@ Among affiliation-based measures, the recommended default is `:primary` because 
 
 The other main category of algorithm attempts to gauge capacity and enthusiasm for training based on actual service.  While the reliance on proven investment has several attractions,  it is worth noting that these algorithms can have the tendency to preserve any status quo since service opportunities are in proportion to the number of students.
 
-To compute total faculty effort, we first compute an "effort matrix" for each faculty/program pair:
+To compute total faculty effort, we first compute an "effort matrix" for each faculty/program pair.
+Effort is normalized by how long each program has existed within the date range, so we supply `progyears`
+giving the span of existence of each program; by default this is derived from your configured program list
+(see [`set_programs`](@ref)):
 
 ```jldoctest targets
-julia> faculty, programs, E = faculty_effort(facrecs, 2016:2020);
+julia> progyears = Dict("BBSB" => 2004:2025, "CSB" => 2004:2025, "EEPB" => 2004:2025, "MMMP" => 2004:2025);
+
+julia> faculty, programs, E = faculty_effort(facrecs, 2016:2020; progyears);
 
 julia> faculty
 2-element Vector{String}:

@@ -5,4 +5,4 @@ AdmitConfiguration = "19a2e0a6-566e-4c00-8888-a0edb19dbca0"
 Documenter = "e30172f5-a6a5-5a46-863b-614d45cd2de4"
 
 [compat]
-Documenter = "0.27"
+Documenter = "1"
