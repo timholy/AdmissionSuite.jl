@@ -10,6 +10,8 @@ using Test
 @testset "AdmissionTargets.jl" begin
     @testset "Targets" begin
         dfmt = AdmitConfiguration.date_fmt[]
+        psbst = deepcopy(AdmissionTargets.program_substitutions)
+        delete!(AdmissionTargets.program_substitutions, "HSG")
         AdmitConfiguration.date_fmt[] = DateFormat("mm/dd/yyyy")
         # Test the "don't game the system" ethic
         program_applicants = Dict("ATMP" => 10, "BTMP" => 10, "CTMP" => 10)
@@ -167,5 +169,7 @@ using Test
         @test tgts["ProgB"] ≈ 6
         @test_logs (:warn, "The following programs 'earned' less than one slot (give them notice): [\"ProgA\"]") targets(Dict("ProgA"=>1, "ProgB"=>11), nothing, 11, 2)
         AdmitConfiguration.date_fmt[] = dfmt
+        empty!(AdmissionTargets.program_substitutions)
+        merge!(AdmissionTargets.program_substitutions, psbst)
     end
 end

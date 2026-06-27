@@ -108,6 +108,19 @@ function accum!(ph, pk, pd)
     return ph
 end
 
+function build_program_synonyms(progs)
+    progsubst = Dict(prog => [prog] for prog in progs)
+    for (old, news) in program_substitutions
+        for n in news
+            while !haskey(progsubst, n)
+                n = only(program_substitutions[n])
+            end
+            push!(progsubst[n], old)
+        end
+    end
+    return progsubst
+end
+
 """
     program_candidates = generate_fake_candidates(program_history, season::Integer, program_offer_dates=nothing)
 
