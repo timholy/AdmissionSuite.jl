@@ -11,3 +11,5 @@ AdmissionTargets/examples/*.xlsx
 AdmissionTargets/examples/*.pdf
 AdmissionTargets/examples/*.tex
 LocalPreferences.toml
+Manifest.toml
+Manifest-v*.toml
