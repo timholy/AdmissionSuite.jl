@@ -5,15 +5,23 @@ on:
       - main
     tags: '*'
   pull_request:
+concurrency:
+  # Cancel superseded runs on the same ref, but never cancel runs on main.
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ startsWith(github.ref, 'refs/pull/') }}
 jobs:
   test:
     name: Julia ${{ matrix.version }} - ${{ matrix.os }} - ${{ matrix.arch }} - ${{ github.event_name }}
     runs-on: ${{ matrix.os }}
+    timeout-minutes: 60
+    permissions: # needed by julia-actions/cache to delete old caches
+      actions: write
+      contents: read
     strategy:
       fail-fast: false
       matrix:
         version:
-          - '1.6'
+          - '1.10'
           - '1'
         os:
           - ubuntu-latest
@@ -25,16 +33,7 @@ jobs:
         with:
           version: ${{ matrix.version }}
           arch: ${{ matrix.arch }}
-      - uses: actions/cache@v4
-        env:
-          cache-name: cache-artifacts
-        with:
-          path: ~/.julia/artifacts
-          key: ${{ runner.os }}-test-${{ env.cache-name }}-${{ hashFiles('**/Project.toml') }}
-          restore-keys: |
-            ${{ runner.os }}-test-${{ env.cache-name }}-
-            ${{ runner.os }}-test-
-            ${{ runner.os }}-
+      - uses: julia-actions/cache@v2
       - run: julia --project -e '
           using Pkg;
           Pkg.develop([PackageSpec(path="./AdmitConfiguration"), PackageSpec(path="./Admit"), PackageSpec(path="./AdmissionTargets")])
@@ -50,4 +49,6 @@ jobs:
           directories: AdmitConfiguration/src,Admit/src,AdmissionTargets/src
       - uses: codecov/codecov-action@v5
         with:
-          file: lcov.info
+          files: lcov.info
+          token: ${{ secrets.CODECOV_TOKEN }}
+          fail_ci_if_error: false

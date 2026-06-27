@@ -17,6 +17,7 @@ CSV = "0.9, 0.10"
 MariaDB_Connector_C_jll = "3"
 MariaDB_Connector_ODBC_jll = "3"
 ODBC = "1"
+julia = "1.10"
 
 [extras]
 DBInterface = "a10d1c49-ce27-4219-8d33-6db1a4562965"
